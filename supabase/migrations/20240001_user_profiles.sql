@@ -74,14 +74,10 @@ CREATE TRIGGER on_auth_user_sync
 -- 4. RLS FOR USER PROFILES
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 
-DO $$ 
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'user_can_read_own_profile') THEN
-        CREATE POLICY "user_can_read_own_profile"
-        ON public.user_profiles FOR SELECT
-        USING (auth.uid() = id);
-    END IF;
-END $$;
+DROP POLICY IF EXISTS "user_can_read_own_profile" ON public.user_profiles;
+CREATE POLICY "user_can_read_own_profile"
+  ON public.user_profiles FOR SELECT
+  USING (auth.uid() = id);
 
 -- 5. ERROR LOGS TABLE
 CREATE TABLE IF NOT EXISTS public.error_logs (
