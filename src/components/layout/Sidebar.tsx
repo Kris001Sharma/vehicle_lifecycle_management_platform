@@ -1,6 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/utils/cn';
+import { useAuthStore } from '@/features/auth/store/authStore';
+import { LogoutButton } from '@/features/auth/components/LogoutButton';
 
 interface NavItem {
   label: string;
@@ -16,11 +18,14 @@ interface SidebarProps {
 
 export function Sidebar({ role, navItems, currentPath }: SidebarProps) {
   const appName = import.meta.env.VITE_APP_NAME || 'VLM Platform';
+  const user = useAuthStore((state) => state.user);
 
   return (
     <div className="w-64 bg-slate-900 text-slate-300 flex flex-col h-screen flex-shrink-0">
       <div className="p-6">
-        <h1 className="text-xl font-bold text-white tracking-tight">{appName}</h1>
+        <Link to="/" className="hover:opacity-80 transition-opacity">
+          <h1 className="text-xl font-bold text-white tracking-tight">{appName}</h1>
+        </Link>
       </div>
       
       <nav className="flex-1 px-4 space-y-1">
@@ -46,15 +51,30 @@ export function Sidebar({ role, navItems, currentPath }: SidebarProps) {
         })}
       </nav>
 
-      <div className="p-4 border-t border-slate-800 mt-auto">
-        <div className="flex flex-col gap-1">
-          <span className="text-xs uppercase tracking-wider text-slate-500 font-semibold">User Session</span>
-          <span className="text-sm text-slate-300 truncate">user@example.com</span>
-          <div className="mt-2 inline-flex">
-            <span className="bg-slate-800 text-slate-300 text-xs px-2 py-1 rounded uppercase tracking-wide font-medium">
-              Role: {role}
-            </span>
+      <div className="p-4 border-t border-slate-800 mt-auto bg-slate-900/50">
+        <div className="flex items-center justify-between">
+          <div className="flex-1 min-w-0 pr-2">
+            <p className="text-sm font-bold text-white truncate leading-tight" title={user?.fullName}>
+              {user?.fullName || 'User'}
+            </p>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 mt-0.5">
+              {role}
+            </p>
           </div>
+          <div className="flex-shrink-0">
+            <LogoutButton variant="icon" />
+          </div>
+        </div>
+        
+        <div className="mt-5 pt-4 border-t border-slate-800/20 flex items-center justify-between">
+          <div className="flex flex-col space-y-0.5">
+            {user?.lastLoginAt && (
+              <p className="text-[9px] font-medium text-slate-500 uppercase tracking-tighter">
+                Last login: {new Date(user.lastLoginAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} {new Date(user.lastLoginAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
+          </div>
+          <span className="text-[9px] font-black text-slate-600 tracking-widest">0.1.0</span>
         </div>
       </div>
     </div>
