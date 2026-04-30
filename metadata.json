@@ -1,0 +1,6 @@
+{
+  "name": "VLM SaaS v1",
+  "description": "Vehicle Lifecycle Management System for dealership networks, tracking commercial vehicles from sale to end-of-life.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
