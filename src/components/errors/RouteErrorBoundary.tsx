@@ -1,7 +1,7 @@
 import React from 'react';
 import { logErrorToSupabase } from '@/lib/supabase/error-logger';
 
-type Props = { title?: string };
+type Props = { title?: string; children?: React.ReactNode };
 type State = { hasError: boolean; error: Error | null };
 
 export class RouteErrorBoundary extends React.Component<Props, State> {
@@ -42,6 +42,6 @@ export class RouteErrorBoundary extends React.Component<Props, State> {
         </div>
       );
     }
-    return null; // Don't render children in React Router v6 errorElement
+    return this.props.children || null;
   }
 }

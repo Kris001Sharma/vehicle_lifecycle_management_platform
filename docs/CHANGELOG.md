@@ -1,5 +1,24 @@
 # Changelog
 
+## [Phase 4] — Authentication flow and route guards
+Date: 2026-04-30
+- Built login page with React Hook Form and Zod validation
+- Implemented loginAction with is_active check and role redirect
+- Implemented AuthGuard with role enforcement
+- Implemented protected routes for all three portals
+- Implemented logout with confirmation dialog
+- Implemented 8-hour inactivity logout with 1-minute warning modal
+- Implemented tab restore session validation
+
+## [Phase 3] — Supabase setup and auth infrastructure
+Date: 2026-04-30
+- Created Supabase client singleton with environment validation
+- Created `user_profiles` table with RLS and auto-creation triggers
+- Created `error_logs` table for boundary tracking
+- Implemented Zustand auth store and `extractUser` JWT parser
+- Implemented `useAuthInitializer` with tab-restore and visibility listeners
+- Updated `Providers` to handle async session initialization with full-screen loading
+
 ## [Phase 2] — UI foundation and design system
 Date: 2026-04-30
 - Established complete design language (colors, typography, spacing, component standards)
