@@ -1,5 +1,13 @@
 # Changelog
 
+## [Phase 6] — Audit logging, error handling, precautions
+Date: 2026-04-30
+- Created audit trigger function applied to 7 tables
+- Completed layered error boundary with Supabase logging
+- Created logErrorToSupabase fire-and-forget utility
+- Completed PRECAUTIONS.md for developer and end-user use
+- Added tenant onboarding steps to DEPLOYMENT.md
+
 ## [Phase 5] — Complete database schema
 Date: 2026-04-30
 - Created all core tables with FK constraints and triggers

@@ -27,7 +27,7 @@ export const router = createBrowserRouter([
       {
         path: '/admin/*',
         element: (
-          <RouteErrorBoundary title="Admin Portal Error">
+          <RouteErrorBoundary portalName="Admin Portal">
             <AuthGuard allowedRoles={['admin']}>
               <AdminDashboard />
             </AuthGuard>
@@ -37,7 +37,7 @@ export const router = createBrowserRouter([
       {
         path: '/sales/*',
         element: (
-          <RouteErrorBoundary title="Sales Portal Error">
+          <RouteErrorBoundary portalName="Sales Portal">
             <AuthGuard allowedRoles={['sales']}>
               <SalesDashboard />
             </AuthGuard>
@@ -47,7 +47,7 @@ export const router = createBrowserRouter([
       {
         path: '/service/*',
         element: (
-          <RouteErrorBoundary title="Service Portal Error">
+          <RouteErrorBoundary portalName="Service Portal">
             <AuthGuard allowedRoles={['service']}>
               <ServiceDashboard />
             </AuthGuard>
