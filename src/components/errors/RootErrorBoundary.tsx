@@ -1,5 +1,5 @@
 import React from 'react';
-import { logErrorToSupabase } from '@/lib/supabase/error-logger';
+import { logErrorToSupabase } from '@/utils/logErrorToSupabase';
 
 type State = { hasError: boolean; error: Error | null; errorInfo: React.ErrorInfo | null };
 
@@ -15,7 +15,12 @@ export class RootErrorBoundary extends React.Component<{ children: React.ReactNo
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({ errorInfo });
-    logErrorToSupabase(error, errorInfo.componentStack);
+    logErrorToSupabase({
+      errorMessage: error.message,
+      errorStack: error.stack,
+      componentStack: errorInfo.componentStack || undefined,
+      currentUrl: window.location.href,
+    });
   }
 
   render() {
@@ -25,10 +30,15 @@ export class RootErrorBoundary extends React.Component<{ children: React.ReactNo
           <h1 className="text-3xl font-bold mb-2">{import.meta.env.VITE_APP_NAME || 'VLM Platform'}</h1>
           <h2 className="text-xl font-semibold mb-6 text-red-600">Something went wrong</h2>
           
-          {import.meta.env.DEV && this.state.error && (
+          {import.meta.env.DEV && this.state.error ? (
             <pre className="bg-gray-800 text-gray-100 p-4 rounded-lg overflow-auto max-w-full mb-6">
               {this.state.error.toString()}
+              {this.state.errorInfo?.componentStack}
             </pre>
+          ) : (
+            <p className="text-gray-600 mb-6 text-center max-w-md">
+              We're sorry, an unexpected error occurred. Our team has been notified.
+            </p>
           )}
 
           <button

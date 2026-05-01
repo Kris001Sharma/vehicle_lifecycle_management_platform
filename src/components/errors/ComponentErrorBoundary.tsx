@@ -1,7 +1,7 @@
 import React from 'react';
-import { logErrorToSupabase } from '@/lib/supabase/error-logger';
+import { logErrorToSupabase } from '@/utils/logErrorToSupabase';
 
-type Props = { componentName: string; children: React.ReactNode };
+type Props = { componentName: string; fallback?: React.ReactNode; children: React.ReactNode };
 type State = { hasError: boolean; error: Error | null };
 
 export class ComponentErrorBoundary extends React.Component<Props, State> {
@@ -15,11 +15,19 @@ export class ComponentErrorBoundary extends React.Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    logErrorToSupabase(error, errorInfo.componentStack);
+    logErrorToSupabase({
+      errorMessage: `[${this.props.componentName}] ${error.message}`,
+      errorStack: error.stack,
+      componentStack: errorInfo.componentStack || undefined,
+      currentUrl: window.location.href,
+    });
   }
 
   render() {
     if (this.state.hasError) {
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
       return (
         <div className="border border-red-200 bg-red-50 p-4 rounded-md">
           <p className="text-sm font-semibold text-red-800 mb-2">
