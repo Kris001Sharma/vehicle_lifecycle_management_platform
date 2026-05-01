@@ -1,5 +1,12 @@
 # Changelog
 
+## [Phase 5] — Complete database schema
+Date: 2026-04-30
+- Created all core tables with FK constraints and triggers
+- Created all indexes including GIN trigram for search
+- Created complete RLS policy set for all three roles
+- Created service record insert trigger for auto-calculation of next service date and km, and vehicle denormalized fields
+
 ## [Phase 4] — Authentication flow and route guards
 Date: 2026-04-30
 - Built login page with React Hook Form and Zod validation
