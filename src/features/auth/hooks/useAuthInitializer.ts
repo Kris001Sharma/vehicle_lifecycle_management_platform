@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { extractUserFromSession } from '../utils/extractUser';
 
 export function useAuthInitializer() {
-  const { setUser, clearAuth, setLoading } = useAuthStore();
+  const { setUser, clearAuth, setLoading, setAuthError } = useAuthStore();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -13,7 +13,14 @@ export function useAuthInitializer() {
     const initSession = async () => {
       try {
         setLoading(true);
-        const { data: { session }, error } = await supabase.auth.getSession();
+        const timeoutPromise = new Promise<{data: {session: null}, error: Error}>((_, reject) =>
+          setTimeout(() => reject(new Error('Auth timeout')), 10000)
+        );
+
+        const { data: { session }, error } = await Promise.race([
+          supabase.auth.getSession(),
+          timeoutPromise
+        ]);
         
         if (error) throw error;
 
@@ -39,9 +46,13 @@ export function useAuthInitializer() {
         } else {
           clearAuth();
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Auth initialization error:', err);
-        clearAuth();
+        if (err.message === 'Auth timeout') {
+          setAuthError(true);
+        } else {
+          clearAuth();
+        }
       } finally {
         setLoading(false);
       }

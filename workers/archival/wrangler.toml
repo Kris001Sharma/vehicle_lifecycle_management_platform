@@ -1,0 +1,10 @@
+name = "vlm-archival"
+main = "src/index.ts"
+compatibility_date = "2024-04-05"
+
+[triggers]
+crons = ["0 * * * *"] # Run every hour
+
+[[kv_namespaces]]
+binding = "ARCHIVAL_KV"
+id = "<your-kv-namespace-id>"

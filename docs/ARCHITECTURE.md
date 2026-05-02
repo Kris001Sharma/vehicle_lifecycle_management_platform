@@ -23,6 +23,22 @@
 ## Feature Structure
 The application is structured around "features" (e.g., `auth`, `admin`, `sales`, `service`) rather than technical type (all components in one folder). Each feature folder contains the pages, components, and hooks specific to that domain. Shared code lives in the root `components`, `hooks`, or `lib` directories.
 
+## Database Structure
+The database is built on PostgreSQL via Supabase, with Row-Level Security (RLS) enabled on all tables. 
+Currently the application establishes the following schema:
+- `user_profiles`
+- `tenants`
+
+More tables will be added over subsequent phases.
+
+## Security Architecture Overview
+- **Security Headers & CSP:** Configured using the `public/_headers` file.
+- **Bot Protection:** Cloudflare Turnstile integrated on the login entry point.
+- **Rate Limiting:** Managed using a `login_attempts` table, custom Postgres function (`check_login_rate`), and `pg_cron` cleanup.
+- **CORS Restrictions:** Expressly outlined on all edge functions explicitly setting allowed domain.
+- **Attachments:** Files are referenced by their `file_key` exclusively. Long-lived presigned URLs are generated on demand.
+- **Archival Worker Strategy:** Utilizes a KV cursor for executing a one-vehicle-per-invocation logic guaranteeing minimal CPU spikes per interval.
+
 ## Design Language System
 - Primary: slate-900 (text, headings, active states)
 - Secondary: slate-600 (secondary text, labels)
