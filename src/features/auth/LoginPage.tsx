@@ -8,6 +8,7 @@ import { ChevronRight, Shield, ArrowLeft, RefreshCcw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { getRoleRedirect } from './utils/getRoleRedirect';
 import { loginAction } from './actions/loginAction';
+import { Turnstile } from '@marsidev/react-turnstile';
 
 const emailSchema = z.object({
   email: z.string().email("ENTER A VALID ORGANIZATION EMAIL"),
@@ -27,7 +28,18 @@ export function LoginPage() {
   const [step, setStep] = useState<'email' | 'password'>('email');
   const [email, setEmail] = useState('');
   const [serverError, setServerError] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
   const navigate = useNavigate();
+
+  const handleTurnstileSuccess = (token: string) => {
+    setTurnstileToken(token);
+    setServerError(null);
+  };
+
+  const handleTurnstileError = () => {
+    setTurnstileToken('');
+    setServerError('Security check failed. Please try again.');
+  };
 
   const {
     register: registerEmail,
@@ -52,13 +64,19 @@ export function LoginPage() {
   };
 
   const onPasswordSubmit = async (data: PasswordFormValues) => {
+    if (!turnstileToken) {
+      setServerError('Security check required.');
+      return;
+    }
     setServerError(null);
-    const result = await loginAction(email, data.password);
+    const result = await loginAction(email, data.password, turnstileToken);
     
     if (result.success && result.role) {
       navigate(getRoleRedirect(result.role), { replace: true });
     } else {
       setServerError(result.error || 'AUTHENTICATION FAILED');
+      // Reset turnstile token when there is an error to prompt re-verification
+      setTurnstileToken('');
     }
   };
 
@@ -222,10 +240,20 @@ export function LoginPage() {
                       </motion.div>
                     )}
 
+                    <div className="flex justify-center">
+                      <Turnstile
+                        siteKey={import.meta.env.DEV ? '1x00000000000000000000AA' : (import.meta.env.VITE_TURNSTILE_SITE_KEY || '')}
+                        onSuccess={handleTurnstileSuccess}
+                        onError={handleTurnstileError}
+                        onExpire={handleTurnstileError}
+                      />
+                    </div>
+
                     <Button 
                       type="submit" 
-                      className="relative w-full h-16 bg-slate-900 hover:bg-slate-800 transition-all rounded-none shadow-lg shadow-slate-100"
+                      className="relative w-full h-16 bg-slate-900 hover:bg-slate-800 transition-all rounded-none shadow-lg shadow-slate-100 disabled:opacity-50"
                       isLoading={isSubmitting}
+                      disabled={!turnstileToken}
                     >
                       <span className="text-[11px] font-black tracking-[0.2em] uppercase">Authorize Access</span>
                       <motion.div 

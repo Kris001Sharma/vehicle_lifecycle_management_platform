@@ -1,5 +1,17 @@
 # Changelog
 
+## [Security phase] — Security hardening
+- Added _headers file with CSP and security headers
+- Integrated Cloudflare Turnstile bot protection on login
+- Implemented rate limiting by email and IP with pg_cron cleanup
+- Added CORS restriction to all Edge Functions
+- Changed attachments to store file_key instead of file_url
+- Added archive access logging to audit_logs
+- Built audit log viewer in admin portal
+- Added auth initializer 10-second timeout with error state
+- Implemented one-vehicle-per-invocation archival with KV cursor
+- Documented session revocation and bundle security checks
+
 ## [Phase 6] — Audit logging, error handling, precautions
 Date: 2026-04-30
 - Created audit trigger function applied to 7 tables

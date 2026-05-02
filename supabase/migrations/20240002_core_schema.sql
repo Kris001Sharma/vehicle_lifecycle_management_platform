@@ -278,6 +278,7 @@ CREATE TABLE IF NOT EXISTS public.attachments (
   entity_id UUID NOT NULL,
   file_name TEXT NOT NULL,
   file_url TEXT NOT NULL,
+  file_key TEXT,
   storage_provider TEXT NOT NULL
     CHECK (storage_provider IN ('r2', 'cloudinary')),
   cloudinary_public_id TEXT,
@@ -293,7 +294,7 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
   tenant_id UUID,
   user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   action TEXT NOT NULL CHECK (action IN
-    ('INSERT', 'UPDATE', 'DELETE')),
+    ('INSERT', 'UPDATE', 'DELETE', 'SELECT')),
   table_name TEXT NOT NULL,
   record_id UUID NOT NULL,
   old_value JSONB,
@@ -301,3 +302,67 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
   ip_address TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- login_attempts table
+CREATE TABLE IF NOT EXISTS public.login_attempts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email TEXT NOT NULL,
+  ip_address TEXT,
+  success BOOLEAN NOT NULL DEFAULT false,
+  attempted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_login_attempts_email_time
+  ON public.login_attempts(email, attempted_at);
+CREATE INDEX IF NOT EXISTS idx_login_attempts_ip_time
+  ON public.login_attempts(ip_address, attempted_at);
+
+-- login rate limit function
+CREATE OR REPLACE FUNCTION public.check_login_rate(
+  p_email TEXT,
+  p_ip TEXT
+) RETURNS TABLE(
+  is_locked_email BOOLEAN,
+  is_locked_ip BOOLEAN,
+  attempts_remaining INT
+) AS $$
+DECLARE
+  v_email_attempts INT;
+  v_ip_attempts INT;
+  v_limit INT := 5;
+  v_window INTERVAL := '15 minutes';
+BEGIN
+  SELECT COUNT(*) INTO v_email_attempts
+  FROM public.login_attempts
+  WHERE email = p_email
+    AND success = false
+    AND attempted_at > NOW() - v_window;
+
+  SELECT COUNT(*) INTO v_ip_attempts
+  FROM public.login_attempts
+  WHERE ip_address = p_ip
+    AND success = false
+    AND attempted_at > NOW() - v_window;
+
+  RETURN QUERY SELECT
+    v_email_attempts >= v_limit,
+    v_ip_attempts >= (v_limit * 3),
+    GREATEST(0, v_limit - v_email_attempts);
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Optional: Cleanup job using pg_cron
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_extension WHERE extname = 'pg_cron'
+  ) THEN
+    CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA pg_catalog;
+  END IF;
+  
+  -- Use PERFORM to schedule if cron is available
+  PERFORM cron.schedule('cleanup-login-attempts', '0 0 * * *', 'DELETE FROM public.login_attempts WHERE attempted_at < NOW() - INTERVAL ''24 hours''');
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Ignore if pg_cron is not available
+END $$;

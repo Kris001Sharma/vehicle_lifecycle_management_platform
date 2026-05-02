@@ -38,6 +38,15 @@ This document outlines important operational and technical rules for the Vehicle
 
 ## For the developer
 
+Supabase Auth free tier rate limits:
+  Email sending: 30 emails per hour per project
+  Sign-in attempts: Supabase applies internal limits
+    (not publicly documented) — the login_attempts table
+    and check_login_rate function provide application-level
+    protection independent of Supabase limits.
+  If you see "rate limit exceeded" errors during testing:
+    wait 15 minutes or use a different email for test users.
+
 - Cloudflare Pages and Cloudflare Workers manage environment variables SEPARATELY. Changing a variable in Pages does NOT update it in Workers. Always update both when rotating keys.
 - Supabase free tier pauses after 7 days of inactivity. A keep-alive Worker runs every 4 days to prevent this. If the Worker is disabled or fails, the database may pause.
 - R2 presigned URLs expire after 1 hour. The application regenerates them automatically if an image fails to load.
