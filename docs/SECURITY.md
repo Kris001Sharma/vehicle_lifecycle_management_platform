@@ -29,13 +29,13 @@ Understanding how the pieces connect is critical for troubleshooting:
 
 ### B. Supabase Dashboard (Backend Security)
 
-#### Edge Function Secrets (Critical)
-The Edge Function is the "middleman" that talks to Cloudflare. It needs your secret key stored securely.
+#### Edge Function Secrets (CRITICAL for Production)
+The Edge Function is the "middleman" that talks to Cloudflare. It needs your REAL PROD secret key stored securely.
 1.  Go to **Edge Functions** -> Click `verify-turnstile`.
 2.  Go to **Secrets** (or Manage Secrets).
 3.  Add/Update these two:
-    - `TURNSTILE_SECRET_KEY`: Use the secret key from Cloudflare.
-    - `ALLOWED_ORIGIN`: Set to `*` for testing in AI Studio, or `https://vlm-platform.pages.dev` for production.
+    - `TURNSTILE_SECRET_KEY`: Use the **Secret Key** from the Cloudflare Turnstile dashboard (for your production domain).
+    - `ALLOWED_ORIGIN`: Set to `https://vlm-platform.pages.dev` (Must include `https://`).
 
 #### API CORS
 1.  Go to **Settings** -> **API**.

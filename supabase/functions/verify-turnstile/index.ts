@@ -18,32 +18,34 @@ serve(async (req) => {
     const secretKey = Deno.env.get('TURNSTILE_SECRET_KEY')
 
     if (!secretKey) {
-      console.error('TURNSTILE_SECRET_KEY is missing in Edge Function environment')
+      console.error('CRITICAL: TURNSTILE_SECRET_KEY is missing in Edge Function environment')
       return new Response(
-        JSON.stringify({ valid: false, error: 'Server configuration error: Secret key missing' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ valid: false, error: 'Internal Server Error: Secret key missing' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Standard Cloudflare verification expects a POST request with specific parameters.
-    // Using FormData is the most robust way to ensure it matches their expected multipart/form-data or url-encoded formats.
-    const formData = new FormData()
-    formData.append('secret', secretKey)
-    formData.append('response', token)
-    
-    console.log('Verifying turnstile token with Cloudflare siteverify...')
+    // Standard Cloudflare siteverify expects application/x-www-form-urlencoded
+    const params = new URLSearchParams();
+    params.append('secret', secretKey);
+    params.append('response', token);
+
+    console.log('Sending verification request to Cloudflare siteverify...')
 
     const result = await fetch('https://challenges.cloudflare.com/turnstile/v1/siteverify', {
       method: 'POST',
-      body: formData,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: params.toString(),
     })
 
     if (!result.ok) {
       const errorText = await result.text()
-      console.error('Cloudflare API returned error:', result.status, errorText)
+      console.error(`Cloudflare API returned ${result.status}:`, errorText)
       return new Response(
-        JSON.stringify({ valid: false, error: `Cloudflare API error: ${result.status}` }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ valid: false, error: `Cloudflare connectivity issue (${result.status})` }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
