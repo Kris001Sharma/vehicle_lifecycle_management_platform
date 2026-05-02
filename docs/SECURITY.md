@@ -29,17 +29,17 @@ Understanding how the pieces connect is critical for troubleshooting:
 
 ### B. Supabase Dashboard (Backend Security)
 
-#### Edge Function Secrets (CRITICAL for Production)
-The Edge Function is the "middleman" that talks to Cloudflare. It needs your REAL PROD secret key stored securely.
-1.  Go to **Edge Functions** -> Click `verify-turnstile`.
-2.  Go to **Secrets** (or Manage Secrets).
-3.  Add/Update these two:
-    - `TURNSTILE_SECRET_KEY`: Use the **Secret Key** from the Cloudflare Turnstile dashboard (for your production domain).
-    - `ALLOWED_ORIGIN`: Set to `https://vlm-platform.pages.dev` (Must include `https://`).
+#### Auth URL Configuration
+1.  Go to **Authentication** -> **URL Configuration**.
+2.  **Site URL**: Set to `https://vlm-platform.pages.dev`. This is the base URL for auth redirects.
+3.  **Redirect URLs**: Add `https://vlm-platform.pages.dev/**` to the white-list to ensure your app can safely return users to the dashboard after login.
 
-#### API CORS
-1.  Go to **Settings** -> **API**.
-2.  In **Allowed Origins**, ensure your Pages URL is added to prevent unauthorized domains from querying your database.
+#### Edge Function Secrets (CRITICAL)
+1.  Go to **Edge Functions** -> Click `verify-turnstile`.
+2.  Go to **Settings** -> **Secrets**.
+3.  Add/Update:
+    - `TURNSTILE_SECRET_KEY`: Use the **Secret Key** from Cloudflare.
+    - `ALLOWED_ORIGIN`: `https://vlm-platform.pages.dev`.
 
 ---
 
@@ -52,20 +52,23 @@ Since you cannot use the `supabase` CLI in AI Studio, we use **GitHub Actions** 
 
 ---
 
-## 4. Testing & Verification Checklist
+## 4. Troubleshooting & Verification checklist (Production-Grade)
 
 | Test Item | Verification Method | Expected Result |
 | :--- | :--- | :--- |
-| **Bot Widget** | Open Login Page | Cloudflare logo appears above the button. |
-| **Edge Function** | Click Login | No "Turnstile verification invocation error" in console. |
-| **Secret Match** | Check Edge Logs | `Cloudflare verification outcome: { success: true ... }` shows in Supabase Logs. |
-| **Rate Limit** | Fail login 6 times | Attempt 6 should immediately show "Too many attempts" without checking password. |
-| **Audit Log** | Check Supabase SQL | Use `SELECT * FROM login_attempts` to see your history. |
+| **Bot Widget** | Open Login Page | The Cloudflare Turnstile widget should render without a "CSP" or "Blocked" error in the console. |
+| **Verification (405 Fix)** | Click Login | The Edge Function now uses standard `URLSearchParams` which eliminates the "405 Method Not Allowed" error from Cloudflare. |
+| **CSP Compliance** | Browser Console | Should be clean of "TrustedHTML" or "TrustedScript" errors (Relaxed CSP with `unsafe-eval` and `https://` origins). |
+| **Success Flow** | Authentication | Upon successful bot verification and correct credentials, you should be redirected to your dashboard. |
 
 ---
 
-## 5. Troubleshooting 405 Errors
-A `405 Method Not Allowed` usually means the Cloudflare verification request was rejected.
-- **Check Headers**: Ensure the `Content-Type` is not being manually set to something invalid (the Edge Function handles this).
-- **Verify Method**: Ensure the request is a `POST`.
-- **Site Key/Secret Key**: Ensure you haven't swapped the Site Key and the Secret Key by mistake. Secret Key belongs in Supabase; Site Key belongs in Cloudflare Pages.
+## 5. Critical Environment variables Reminder
+
+Ensure these are set Exactly as shown in your dashboards:
+
+1. **Cloudflare Pages**: 
+   - `VITE_TURNSTILE_SITE_KEY`: Your Turnstile **Site Key**.
+2. **Supabase Secrets**:
+   - `TURNSTILE_SECRET_KEY`: Your Turnstile **Secret Key**.
+   - `ALLOWED_ORIGIN`: `https://vlm-platform.pages.dev` (No trailing slash).

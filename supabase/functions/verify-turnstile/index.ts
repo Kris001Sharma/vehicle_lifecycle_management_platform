@@ -18,39 +18,37 @@ serve(async (req) => {
     const secretKey = Deno.env.get('TURNSTILE_SECRET_KEY')
 
     if (!secretKey) {
-      console.error('CRITICAL: TURNSTILE_SECRET_KEY is missing in Edge Function environment')
+      console.error('TURNSTILE_SECRET_KEY is missing in Edge Function environment')
       return new Response(
-        JSON.stringify({ valid: false, error: 'Internal Server Error: Secret key missing' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ valid: false, error: 'Server configuration error' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // Standard Cloudflare siteverify expects application/x-www-form-urlencoded
-    const params = new URLSearchParams();
-    params.append('secret', secretKey);
-    params.append('response', token);
-
-    console.log('Sending verification request to Cloudflare siteverify...')
+    // siteverify expects either multipart/form-data or application/x-www-form-urlencoded.
+    // Using FormData is generally the most reliable way as Deno fetch will handle the boundaries.
+    const formData = new FormData()
+    formData.append('secret', secretKey)
+    formData.append('response', token)
+    
+    console.log('Invoking Cloudflare siteverify with FormData...')
 
     const result = await fetch('https://challenges.cloudflare.com/turnstile/v1/siteverify', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: params.toString(),
+      body: formData,
     })
 
     if (!result.ok) {
       const errorText = await result.text()
-      console.error(`Cloudflare API returned ${result.status}:`, errorText)
+      console.error(`Cloudflare API error ${result.status}:`, errorText)
       return new Response(
-        JSON.stringify({ valid: false, error: `Cloudflare connectivity issue (${result.status})` }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ valid: false, error: `Cloudflare verify failed (${result.status})` }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     const outcome = await result.json()
-    console.log('Cloudflare verification outcome:', outcome)
+    console.log('Verification outcome:', outcome)
 
     return new Response(
       JSON.stringify({ 
