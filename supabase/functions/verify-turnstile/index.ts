@@ -25,19 +25,17 @@ serve(async (req) => {
       )
     }
 
-    // Use URLSearchParams instead of FormData for better reliability in siteverify
-    const params = new URLSearchParams()
-    params.append('secret', secretKey)
-    params.append('response', token)
+    // Standard Cloudflare verification expects a POST request with specific parameters.
+    // Using FormData is the most robust way to ensure it matches their expected multipart/form-data or url-encoded formats.
+    const formData = new FormData()
+    formData.append('secret', secretKey)
+    formData.append('response', token)
     
-    console.log('Verifying turnstile token with Cloudflare...')
+    console.log('Verifying turnstile token with Cloudflare siteverify...')
 
     const result = await fetch('https://challenges.cloudflare.com/turnstile/v1/siteverify', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: params.toString(),
+      body: formData,
     })
 
     if (!result.ok) {

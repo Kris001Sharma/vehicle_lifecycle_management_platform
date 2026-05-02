@@ -1,96 +1,71 @@
-# Security Architecture & Manual Configuration (Prompt 7)
+# Security Architecture & Manual Configuration (Phase 7)
 
-This document outlines the security layers implemented in the VLM Platform and the manual steps required to configure them via the various dashboards.
-
-## 1. Cloudflare Turnstile (Bot Protection)
-
-We use Cloudflare Turnstile to prevent automated bots from attempting login. This is a non-intrusive alternative to CAPTCHA.
-
-### How it works:
-1.  **Frontend**: The login page renders a Turnstile widget.
-2.  **Verification**: When a user prepares to log in, Turnstile issues a token.
-3.  **Server-side Check**: The token is sent to the Supabase Edge Function `verify-turnstile`.
-4.  **Backend**: The Edge Function calls Cloudflare's API to verify the token using your `TURNSTILE_SECRET_KEY`.
-
-### Manual Steps (Cloudflare Dashboard):
-1.  Log in to your **Cloudflare Dashboard**.
-2.  In the left sidebar, navigate to **Turnstile**.
-3.  Click **Add Site**.
-4.  Enter a name (e.g., "VLM Platform Production").
-5.  Enter your domain: `vlm-platform.pages.dev` (and any custom domains you use).
-6.  Select **Widget Type**: "Managed" is recommended for best security.
-7.  Click **Create**.
-8.  **Copy the Keys**:
-    -   **Site Key**: Add this to your Cloudflare Pages Environment Variables as `VITE_TURNSTILE_SITE_KEY`.
-    -   **Secret Key**: Save this for the Supabase step below.
+This document provides a detailed breakdown of the security layers implemented for the VLM Platform. Since we are operating in **AI Studio**, all steps are designed for manual dashboard interaction rather than terminal commands.
 
 ---
 
-## 2. Supabase Integration (Edge Functions & Auth)
+## 1. The Security Flow
+Understanding how the pieces connect is critical for troubleshooting:
 
-Supabase handles the verification of the bot token and login rate limiting.
+1.  **Bot Detection**: The `LoginPage` renders a Cloudflare Turnstile widget.
+2.  **Token Issuance**: When verified, Turnstile provides a `token`.
+3.  **Edge Verification**: The app sends this token to your Supabase Edge Function (`verify-turnstile`).
+4.  **Cloudflare Check**: The Edge Function calls Cloudflare's API (`siteverify`) using your private `TURNSTILE_SECRET_KEY`.
+5.  **Authentication**: Only if the token is valid does the app proceed to check the username and password with Supabase Auth.
+6.  **Rate Limiting**: Every login attempt (success or failure) is logged in the `login_attempts` table. If a user/IP hits 5 failures in 15 minutes, they are locked out.
 
-### Manual Steps (Supabase Dashboard):
+---
 
-#### A. Edge Function Secrets
-Since the Edge Function needs to talk to Cloudflare, it needs the Secret Key.
-1.  Navigate to **Edge Functions** in the sidebar.
-2.  Click on the `verify-turnstile` function.
-3.  Go to **Manage Secrets** (or Settings).
-4.  Add a new secret:
-    -   **Key**: `TURNSTILE_SECRET_KEY`
-    -   **Value**: (The Secret Key from the Cloudflare step above).
-5.  Add another secret for security check logic:
-    -   **Key**: `ALLOWED_ORIGIN`
-    -   **Value**: `https://vlm-platform.pages.dev` (Must include `https://` for CORS to work).
+## 2. Detailed Dashboard Instructions
 
-#### B. API CORS Settings
-Restricts which browsers can talk to your database.
+### A. Cloudflare Dashboard (Bot Protection)
+1.  **Navigate to Turnstile**: Find "Turnstile" in your Cloudflare sidebar.
+2.  **Add/Edit Widget**: 
+    - **Hostnames**: Add `vlm-platform.pages.dev` and any preview URLs from AI Studio if testing there.
+    - **Mode**: Use "Managed" (Recommended).
+3.  **Obtain Keys**:
+    - **Site Key**: Copy this to your Cloudflare Pages Variables as `VITE_TURNSTILE_SITE_KEY`.
+    - **Secret Key**: Copy this for the Supabase step.
+
+### B. Supabase Dashboard (Backend Security)
+
+#### Edge Function Secrets (Critical)
+The Edge Function is the "middleman" that talks to Cloudflare. It needs your secret key stored securely.
+1.  Go to **Edge Functions** -> Click `verify-turnstile`.
+2.  Go to **Secrets** (or Manage Secrets).
+3.  Add/Update these two:
+    - `TURNSTILE_SECRET_KEY`: Use the secret key from Cloudflare.
+    - `ALLOWED_ORIGIN`: Set to `*` for testing in AI Studio, or `https://vlm-platform.pages.dev` for production.
+
+#### API CORS
 1.  Go to **Settings** -> **API**.
-2.  Scroll to **CORS Config**.
-3.  In **Allowed Origins**, add: `https://vlm-platform.pages.dev`.
-
-#### C. SQL Migrations (Rate Limiting)
-Ensure the `login_attempts` table and `check_login_rate` function are present.
--   These are defined in `supabase/migrations/20240002_core_schema.sql`.
--   If you've already run the migrations, your login system is protected by a 5-attempt limit per 15 minutes.
+2.  In **Allowed Origins**, ensure your Pages URL is added to prevent unauthorized domains from querying your database.
 
 ---
 
-## 3. GitHub Actions (Edge Function Deployment)
+## 3. GitHub Integration (Auto-Deployment)
+Since you cannot use the `supabase` CLI in AI Studio, we use **GitHub Actions** to deploy your code to Supabase.
 
-Because Edge Functions are written in TypeScript/Deno, they must be "deployed" to Supabase.
-
-### Manual Steps (GitHub Settings):
-1.  Go to your GitHub Repository **Settings** -> **Secrets and variables** -> **Actions**.
-2.  Add **New repository secret**:
-    -   `SUPABASE_ACCESS_TOKEN`: Go to [Supabase Dashboard -> Account -> Access Tokens](https://supabase.com/dashboard/account/tokens) to generate one.
-    -   `SUPABASE_PROJECT_ID`: Found in your Supabase project URL (e.g., `https://supabase.com/dashboard/project/YOUR_ID_HERE`).
-
-Once added, any push to the `main` branch that changes anything in `supabase/functions/` will automatically redeploy the security logic.
+1.  **Commit the Code**: When I update files in `supabase/functions/`, you simply click the **Sync/Push** button in AI Studio.
+2.  **Verify Action**: Go to your GitHub repo -> **Actions** tab. You should see a workflow named "Deploy Supabase Functions".
+3.  **Secrets Required**: If the action fails, ensure you added `SUPABASE_ACCESS_TOKEN` and `SUPABASE_PROJECT_ID` to your GitHub Repo Secrets.
 
 ---
 
-## 4. Troubleshooting "Security Check Failed"
+## 4. Testing & Verification Checklist
 
-If you see this error on the login page:
-
-1.  **Check Browser Console**: Look for 500 errors calling `verify-turnstile`.
-2.  **Verify Secrets**: Ensure `TURNSTILE_SECRET_KEY` in Supabase matches the one in Cloudflare exactly.
-3.  **Check Site Key**: Ensure `VITE_TURNSTILE_SITE_KEY` in Cloudflare Pages environment variables is correct (and that you redeployed after adding it).
-4.  **Domain Mismatch**: Ensure `ALLOWED_ORIGIN` in Supabase secrets matches the domain you are accessing (e.g., `vlm-platform.pages.dev`).
+| Test Item | Verification Method | Expected Result |
+| :--- | :--- | :--- |
+| **Bot Widget** | Open Login Page | Cloudflare logo appears above the button. |
+| **Edge Function** | Click Login | No "Turnstile verification invocation error" in console. |
+| **Secret Match** | Check Edge Logs | `Cloudflare verification outcome: { success: true ... }` shows in Supabase Logs. |
+| **Rate Limit** | Fail login 6 times | Attempt 6 should immediately show "Too many attempts" without checking password. |
+| **Audit Log** | Check Supabase SQL | Use `SELECT * FROM login_attempts` to see your history. |
 
 ---
 
-## 5. Content Security Policy (Headers)
-
-We have implemented a strict CSP in `public/_headers` to prevent XSS and data exfiltration.
-
-**Manual Verification**:
-1.  Navigate to your deployed site.
-2.  Open **Developer Tools** (F12) -> **Network**.
-3.  Click on the main document request.
-4.  Verify the `Content-Security-Policy` header is present and contains:
-    -   `challenges.cloudflare.com` (for Turnstile)
-    -   `*.supabase.co` (for database)
-    -   `res.cloudinary.com` (for images)
+## 5. Troubleshooting 405 Errors
+A `405 Method Not Allowed` usually means the Cloudflare verification request was rejected.
+- **Check Headers**: Ensure the `Content-Type` is not being manually set to something invalid (the Edge Function handles this).
+- **Verify Method**: Ensure the request is a `POST`.
+- **Site Key/Secret Key**: Ensure you haven't swapped the Site Key and the Secret Key by mistake. Secret Key belongs in Supabase; Site Key belongs in Cloudflare Pages.
