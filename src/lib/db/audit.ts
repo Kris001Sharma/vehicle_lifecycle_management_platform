@@ -12,19 +12,8 @@ export async function getAuditLogs(tenantId: string, filters: AuditLogFilter, pa
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
 
-  async function performQuery(withJoin: boolean) {
-    let query = supabase.from('audit_logs');
-    
-    if (withJoin) {
-      query = query.select(`
-        *,
-        user_profiles (
-          email
-        )
-      `, { count: 'exact' }) as any;
-    } else {
-      query = query.select('*', { count: 'exact' }) as any;
-    }
+  async function performQuery() {
+    let query: any = supabase.from('audit_logs').select('*', { count: 'exact' });
 
     query = query.eq('tenant_id', tenantId);
 
@@ -40,24 +29,21 @@ export async function getAuditLogs(tenantId: string, filters: AuditLogFilter, pa
     if (filters.toDate) {
       query = query.lte('created_at', filters.toDate);
     }
-    
-    if (withJoin && filters.userEmail) {
-      query = query.eq('user_profiles.email', filters.userEmail).not('user_profiles', 'is', null);
+
+    // Since we don't have user_profiles join, filtering by user email will only match user_id directly if it happens to be an email
+    // but typically user_id is a UUID. For now, if they filter by email, we ignore or map.
+    if (filters.userEmail) {
+      // Just filter by user_id assuming it might match if they typed a UUID
+      query = query.eq('user_id', filters.userEmail);
     }
 
     return query.order('created_at', { ascending: false }).range(from, to);
   }
 
   try {
-    const { data, count, error } = await performQuery(true);
+    const { data, count, error } = await performQuery();
     
     if (error) {
-      // PGRST200 means relationship not found in schema cache
-      if (error.code === 'PGRST200') {
-        const { data: simpleData, count: simpleCount, error: simpleError } = await performQuery(false);
-        if (simpleError) throw simpleError;
-        return { data: simpleData, count: simpleCount || 0 };
-      }
       throw error;
     }
     

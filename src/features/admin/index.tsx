@@ -7,15 +7,30 @@ import { LayoutDashboard, PackageSearch, Users, Settings, History } from 'lucide
 import { AuditLogPage } from './AuditLogPage';
 import { UserListPage } from './UserListPage';
 import { CatalogPage } from './catalog/CatalogPage';
-import { VariantFormPage } from './catalog/VariantFormPage';
-import { FeaturePage } from './catalog/FeaturePage';
+import { VariantFormV2 } from './catalog/VariantFormV2';
+import { ModelFormPage } from './catalog/ModelFormPage';
+import { CatalogSettingsPage } from './settings/CatalogSettingsPage';
 
 const ADMIN_NAV = [
   { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
-  { label: 'Catalog', path: '/admin/catalog', icon: PackageSearch },
+  { 
+    label: 'Catalog', 
+    path: '/admin/catalog', 
+    icon: PackageSearch,
+    children: [
+        { label: 'Models & Variants', path: '/admin/catalog' },
+    ]
+  },
   { label: 'Users', path: '/admin/users', icon: Users },
   { label: 'Audit Log', path: '/admin/audit-logs', icon: History },
-  { label: 'Settings', path: '/admin/settings', icon: Settings },
+  { 
+    label: 'Settings', 
+    path: '/admin/settings/catalog', 
+    icon: Settings,
+    children: [
+        { label: 'Catalog Settings', path: '/admin/settings/catalog' },
+    ]
+  },
 ];
 
 function AdminDashboardContent() {
@@ -51,13 +66,15 @@ export default function AdminDashboard() {
           <Route path="/audit-logs" element={<AuditLogPage />} />
           <Route path="/users" element={<UserListPage />} />
           <Route path="/catalog" element={<CatalogPage />} />
-          <Route path="/catalog/variants/new" element={<VariantFormPage />} />
-          <Route path="/catalog/variants/:variantId/edit" element={<VariantFormPage />} />
-          <Route path="/catalog/features" element={<FeaturePage />} />
-          <Route path="*" element={<div className="p-8">Work in progress</div>} />
+          <Route path="/catalog/models/new" element={<ModelFormPage />} />
+          <Route path="/catalog/models/:modelId/edit" element={<ModelFormPage />} />
+          <Route path="/catalog/variants/new" element={<VariantFormV2 />} />
+          <Route path="/catalog/variants/:variantId/edit" element={<VariantFormV2 />} />
+          <Route path="/settings/catalog" element={<CatalogSettingsPage />} />
         </Routes>
       </div>
     </div>
   );
 }
+
 

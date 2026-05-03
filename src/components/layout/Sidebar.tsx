@@ -8,6 +8,7 @@ interface NavItem {
   label: string;
   path: string;
   icon: React.ElementType;
+  children?: { label: string; path: string }[];
 }
 
 interface SidebarProps {
@@ -28,27 +29,51 @@ export function Sidebar({ role, navItems, currentPath }: SidebarProps) {
         </Link>
       </div>
       
-      <nav className="flex-1 px-4 space-y-1">
+      <nav className="flex-1 px-4 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
+          const normalizedCurrentPath = currentPath.endsWith('/') && currentPath !== '/' 
+            ? currentPath.slice(0, -1) 
+            : currentPath;
+            
           const isActive = item.path === '/admin' 
-            ? currentPath === '/admin' 
-            : currentPath === item.path || currentPath.startsWith(`${item.path}/`);
+            ? normalizedCurrentPath === '/admin' 
+            : normalizedCurrentPath === item.path || normalizedCurrentPath.startsWith(`${item.path}/`);
           const Icon = item.icon;
           
           return (
-            <Link
-              key={item.path}
-              to={item.path}
-              className={cn(
-                "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                isActive 
-                  ? "bg-indigo-600 text-white" 
-                  : "hover:bg-slate-800 text-slate-300 hover:text-white"
+            <div key={item.path} className="space-y-1">
+              <Link
+                to={item.path}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                  isActive 
+                    ? "bg-indigo-600 text-white" 
+                    : "hover:bg-slate-800 text-slate-300 hover:text-white"
+                )}
+              >
+                <Icon className="h-5 w-5 flex-shrink-0" />
+                {item.label}
+              </Link>
+              
+              {item.children && isActive && (
+                <div className="ml-9 space-y-1">
+                  {item.children.map(child => (
+                    <Link
+                      key={child.path}
+                      to={child.path}
+                      className={cn(
+                        "block px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                        currentPath === child.path
+                          ? "text-white bg-slate-800"
+                          : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                      )}
+                    >
+                      {child.label}
+                    </Link>
+                  ))}
+                </div>
               )}
-            >
-              <Icon className="h-5 w-5 flex-shrink-0" />
-              {item.label}
-            </Link>
+            </div>
           );
         })}
       </nav>

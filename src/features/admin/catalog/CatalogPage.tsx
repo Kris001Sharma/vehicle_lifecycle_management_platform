@@ -1,265 +1,202 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { getVehicleTypes, getModelsByType, getVariantsByModel, cloneVariant, discontinueVariant, createVehicleType, createVehicleModel } from '@/lib/db/catalog';
+import { getModelsWithCategory } from '@/lib/db/catalogV2';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { Modal } from '@/components/ui/Modal';
-import { Input } from '@/components/ui/Input';
-import { useToast } from '@/hooks/useToast';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Plus, Edit2, Copy, Trash2, ChevronRight, Settings } from 'lucide-react';
+import { Plus, Edit2, Search, ChevronDown, ChevronUp, Car } from 'lucide-react';
 import { ComponentErrorBoundary } from '@/components/errors/ComponentErrorBoundary';
+import { supabase } from '@/lib/supabase/client';
 
 function CatalogContent() {
   const { tenantId } = useAuthStore(s => s.user!) || {};
-  const queryClient = useQueryClient();
-  const { showToast } = useToast();
   const navigate = useNavigate();
 
-  const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-
-  // Modals
-  const [isTypeModalOpen, setIsTypeModalOpen] = useState(false);
-  const [newTypeName, setNewTypeName] = useState('');
-
-  const [isModelModalOpen, setIsModelModalOpen] = useState(false);
-  const [newModelName, setNewModelName] = useState('');
-  const [newModelDesc, setNewModelDesc] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
   // Queries
-  const { data: types, isLoading: typesLoading } = useQuery({
-    queryKey: ['vehicle_types', tenantId],
-    queryFn: () => getVehicleTypes(tenantId!),
+  const { data: models = [], isLoading } = useQuery({
+    queryKey: ['vehicle_models', tenantId],
+    queryFn: () => getModelsWithCategory(tenantId!),
     enabled: !!tenantId,
   });
 
-  const { data: models, isLoading: modelsLoading } = useQuery({
-    queryKey: ['vehicle_models', selectedTypeId, tenantId],
-    queryFn: () => getModelsByType(selectedTypeId!, tenantId!),
-    enabled: !!tenantId && !!selectedTypeId,
+  const { data: variants = [] } = useQuery({
+      queryKey: ['all_vehicle_variants', tenantId],
+      queryFn: async () => {
+          const { data, error } = await (supabase as any).from('vehicle_variants').select('*, powertrain:powertrain_types(*)').eq('tenant_id', tenantId);
+          if (error) throw error;
+          return data;
+      },
+      enabled: !!tenantId
   });
 
-  const { data: variants, isLoading: variantsLoading } = useQuery({
-    queryKey: ['vehicle_variants', selectedModelId, tenantId],
-    queryFn: () => getVariantsByModel(selectedModelId!, tenantId!),
-    enabled: !!tenantId && !!selectedModelId,
-  });
+  const filteredModels = useMemo(() => {
+    return models.filter(m => 
+      m.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      m.manufacturer?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [models, searchQuery]);
 
-  // Mutations
-  const createTypeMutation = useMutation({
-    mutationFn: (name: string) => createVehicleType({ name }, tenantId!),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['vehicle_types', tenantId] });
-      setIsTypeModalOpen(false);
-      setNewTypeName('');
-      setSelectedTypeId(data.id);
-      setSelectedModelId(null);
-      showToast('Vehicle type created', 'success');
-    },
-    onError: (err: any) => showToast(err.message, 'error')
-  });
+  const modelsByCategory = filteredModels.reduce((acc: Record<string, any[]>, model: any) => {
+    const categoryName = model.category?.name || 'Uncategorized';
+    if (!acc[categoryName]) acc[categoryName] = [];
+    acc[categoryName].push(model);
+    return acc;
+  }, {} as Record<string, any[]>);
 
-  const createModelMutation = useMutation({
-    mutationFn: (data: { name: string, description: string }) => createVehicleModel({ ...data, type_id: selectedTypeId! }, tenantId!),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['vehicle_models', selectedTypeId, tenantId] });
-      setIsModelModalOpen(false);
-      setNewModelName('');
-      setNewModelDesc('');
-      setSelectedModelId(data.id);
-      showToast('Model created', 'success');
-    },
-    onError: (err: any) => showToast(err.message, 'error')
-  });
+  const toggleCategory = (categoryName: string) => {
+    setExpandedCategories(prev => ({ ...prev, [categoryName]: !prev[categoryName] }));
+  };
 
-  const cloneVariantMutation = useMutation({
-    mutationFn: (variantId: string) => cloneVariant(variantId, tenantId!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vehicle_variants', selectedModelId, tenantId] });
-      showToast('Variant cloned successfully', 'success');
-    },
-    onError: (err: any) => showToast(err.message, 'error')
-  });
+  if (isLoading) {
+      return (
+          <PageWrapper title="Vehicle Catalog">
+              <div className="space-y-6">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-64 w-full" />
+                  <Skeleton className="h-64 w-full" />
+              </div>
+          </PageWrapper>
+      )
+  }
 
-  const discontinueVariantMutation = useMutation({
-    mutationFn: (variantId: string) => discontinueVariant(variantId, tenantId!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vehicle_variants', selectedModelId, tenantId] });
-      showToast('Variant discontinued', 'success');
-    },
-    onError: (err: any) => showToast(err.message, 'error')
-  });
+  const noModelsExist = models.length === 0;
+  const noSearchResults = !noModelsExist && filteredModels.length === 0;
 
   return (
     <PageWrapper 
       title="Vehicle Catalog" 
       actions={
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => navigate('/admin/catalog/features')}>
-            <Settings className="w-4 h-4 mr-2" />
-            Features
-          </Button>
-          <Button onClick={() => setIsTypeModalOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add vehicle type
+          <Button onClick={() => navigate('/admin/catalog/models/new')}>
+            <Plus className="w-4 h-4 mr-2" /> Add model
           </Button>
         </div>
       }
     >
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-12rem)] min-h-[500px]">
-        {/* Column 1: Types */}
-        <Card title="Vehicle Types" className="flex flex-col h-full overflow-hidden">
-          <div className="p-0 overflow-y-auto flex-1">
-          {typesLoading ? (
-            <div className="p-4 space-y-3"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
-          ) : types?.length === 0 ? (
-             <div className="p-8 text-center text-slate-500 text-sm">No vehicle types. Create one to get started.</div>
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {types?.map(t => (
-                <button
-                  key={t.id}
-                  onClick={() => { setSelectedTypeId(t.id); setSelectedModelId(null); }}
-                  className={`w-full text-left px-4 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors ${selectedTypeId === t.id ? 'bg-indigo-50/50 border-l-2 border-indigo-500' : 'border-l-2 border-transparent'}`}
-                >
-                  <span className="font-medium text-slate-900">{t.name}</span>
-                  <ChevronRight className={`w-4 h-4 ${selectedTypeId === t.id ? 'text-indigo-500' : 'text-slate-400'}`} />
-                </button>
-              ))}
+      <div className="max-w-6xl space-y-8">
+        {/* Search Bar */}
+        <div className="relative w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input 
+            type="text"
+            className="w-full h-11 pl-10 pr-4 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            placeholder="Search by manufacturer or model name..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        {noModelsExist && (
+            <div className="py-20 flex flex-col items-center text-center">
+                <Car className="w-12 h-12 text-slate-300 mb-4" />
+                <h3 className="text-slate-900 font-bold text-xl">No models yet</h3>
+                <p className="text-slate-500 mt-2 max-w-sm mb-6">Start by adding your first vehicle model. Each model can have multiple variants with different specifications.</p>
+                <Button onClick={() => navigate('/admin/catalog/models/new')}>
+                    <Plus className="w-4 h-4 mr-2" /> Add your first model
+                </Button>
             </div>
-          )}
-          </div>
-        </Card>
+        )}
 
-        {/* Column 2: Models */}
-        <Card 
-          title="Models" 
-          className="flex flex-col h-full overflow-hidden" 
-          actions={selectedTypeId && (
-            <Button variant="ghost" size="sm" onClick={() => setIsModelModalOpen(true)}>
-              <Plus className="w-4 h-4" />
-            </Button>
-          )}
-        >
-          <div className="p-0 overflow-y-auto flex-1">
-          {!selectedTypeId ? (
-            <div className="p-8 text-center text-slate-400 text-sm">Select a vehicle type to view models</div>
-          ) : modelsLoading ? (
-            <div className="p-4 space-y-3"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
-          ) : models?.length === 0 ? (
-             <div className="p-8 text-center text-slate-500 text-sm">No models found for this type.</div>
-          ) : (
-             <div className="divide-y divide-slate-100">
-               {models?.map(m => (
-                 <button
-                   key={m.id}
-                   onClick={() => setSelectedModelId(m.id)}
-                   className={`w-full text-left px-4 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors ${selectedModelId === m.id ? 'bg-indigo-50/50 border-l-2 border-indigo-500' : 'border-l-2 border-transparent'}`}
-                 >
-                   <div>
-                     <div className="font-medium text-slate-900">{m.name}</div>
-                     {m.description && <div className="text-xs text-slate-500 mt-1">{m.description}</div>}
-                   </div>
-                   <div className="flex items-center gap-3">
-                     <Badge variant={m.is_active ? 'success' : 'neutral'}>{m.is_active ? 'Active' : 'Inactive'}</Badge>
-                     <ChevronRight className={`w-4 h-4 ${selectedModelId === m.id ? 'text-indigo-500' : 'text-slate-400'}`} />
-                   </div>
-                 </button>
-               ))}
-             </div>
-          )}
-          </div>
-        </Card>
+        {noSearchResults && (
+            <div className="py-20 flex flex-col items-center text-center">
+                <h3 className="text-slate-900 font-bold text-xl">No models match your search</h3>
+                <p className="text-slate-500 mt-2">Try a different manufacturer or model name.</p>
+            </div>
+        )}
 
-        {/* Column 3: Variants */}
-        <Card 
-          title="Variants" 
-          className="flex flex-col h-full overflow-hidden" 
-          actions={selectedModelId && (
-            <Button variant="ghost" size="sm" onClick={() => navigate(`/admin/catalog/variants/new?model_id=${selectedModelId}`)}>
-              <Plus className="w-4 h-4" />
-            </Button>
-          )}
-        >
-          <div className="p-0 overflow-y-auto flex-1">
-          {!selectedModelId ? (
-            <div className="p-8 text-center text-slate-400 text-sm">Select a model to view variants</div>
-          ) : variantsLoading ? (
-            <div className="p-4 space-y-3"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div>
-          ) : variants?.length === 0 ? (
-             <div className="p-8 text-center text-slate-500 text-sm">No variants found.</div>
-          ) : (
-             <div className="divide-y divide-slate-100">
-               {variants?.map(v => (
-                 <div key={v.id} className="p-4 hover:bg-slate-50 transition-colors group">
-                   <div className="flex justify-between items-start mb-2">
-                     <div className="font-medium text-slate-900">{v.name}</div>
-                     <Badge variant={v.status === 'active' ? 'success' : v.status === 'draft' ? 'warning' : 'neutral'}>{v.status}</Badge>
-                   </div>
-                   <div className="text-xs text-slate-500 mb-3 font-mono">{v.sku || 'No SKU'}</div>
-                   
-                   <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                     <Button size="sm" variant="secondary" onClick={() => navigate(`/admin/catalog/variants/${v.id}/edit`)}>
-                       <Edit2 className="w-3 h-3 mr-1" /> Edit
-                     </Button>
-                     <Button size="sm" variant="secondary" onClick={() => cloneVariantMutation.mutate(v.id)} disabled={cloneVariantMutation.isPending}>
-                       <Copy className="w-3 h-3 mr-1" /> Clone
-                     </Button>
-                     {v.status === 'active' && (
-                       <Button size="sm" variant="secondary" className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200" onClick={() => discontinueVariantMutation.mutate(v.id)} disabled={discontinueVariantMutation.isPending}>
-                         <Trash2 className="w-3 h-3 mr-1" /> Discontinue
-                       </Button>
-                     )}
-                   </div>
-                 </div>
-               ))}
-             </div>
-          )}
+        {/* Categories Grouped View */}
+        {!noModelsExist && !noSearchResults && (
+          <div className="space-y-4 pb-20">
+            {Object.entries(modelsByCategory).map(([categoryName, catModels]) => {
+              const isExpanded = expandedCategories[categoryName] !== false; // Default expanded
+              return (
+                <div key={categoryName} className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                  <button 
+                    onClick={() => toggleCategory(categoryName)}
+                    className="w-full px-6 py-4 flex items-center justify-between bg-slate-50/50 hover:bg-slate-50 transition-colors border-b border-slate-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <h2 className="font-medium text-slate-500 text-sm uppercase tracking-wide">{categoryName}</h2>
+                      <Badge variant="neutral" className="bg-slate-200 text-slate-600">{catModels.length}</Badge>
+                    </div>
+                    {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
+                  </button>
+                  
+                  {isExpanded && (
+                    <div className="p-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {catModels.map((model: any) => {
+                            const modelVariants = variants.filter((v: any) => v.model_id === model.id);
+                            const powertrainsList = Array.from(new Set(modelVariants.map((v: any) => v.powertrain?.display_label).filter(Boolean)));
+                            
+                            const useTypeClass = {
+                                personal: 'bg-blue-50 text-blue-700',
+                                commercial: 'bg-amber-50 text-amber-700',
+                                both: 'bg-green-50 text-green-700'
+                            }[model.use_type as 'personal' | 'commercial' | 'both'] || 'bg-slate-50 text-slate-700';
+
+                            return (
+                                <div key={model.id} className="bg-white border border-slate-200 rounded-lg p-4 group flex flex-col hover:border-slate-300 transition-colors">
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h3 className="text-base font-semibold text-slate-900">
+                                                {model.manufacturer} {model.name}
+                                            </h3>
+                                        </div>
+                                        <div className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${useTypeClass}`}>
+                                            {model.use_type}
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1">
+                                        {modelVariants.length === 0 ? (
+                                            <div className="bg-amber-50 rounded p-2 text-xs text-amber-700 border border-amber-100/50 mb-3">
+                                                No variants — this model cannot be used in sales until a variant is added.
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-3 mb-3">
+                                                <div className="text-sm text-slate-500">
+                                                    {modelVariants.length} variant{modelVariants.length === 1 ? '' : 's'}
+                                                </div>
+                                                {powertrainsList.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {powertrainsList.map((pt: any) => (
+                                                            <span key={pt} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
+                                                                {pt}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end gap-2 items-center">
+                                        <Button size="sm" variant="secondary" onClick={() => navigate(`/admin/catalog/variants/new?model_id=${model.id}`)}>
+                                            <Plus className="w-3 h-3 mr-1" /> Add variant
+                                        </Button>
+                                        <Button variant="ghost" size="sm" onClick={() => navigate(`/admin/catalog/models/${model.id}/edit`)}>
+                                            <Edit2 className="w-4 h-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
-        </Card>
+        )}
       </div>
-
-      <Modal isOpen={isTypeModalOpen} onClose={() => setIsTypeModalOpen(false)} title="Add Vehicle Type">
-        <div className="space-y-4">
-          <Input 
-            label="Name (e.g. Electric, Diesel)" 
-            value={newTypeName} 
-            onChange={e => setNewTypeName(e.target.value)} 
-            placeholder="Enter type name"
-            autoFocus
-          />
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="secondary" onClick={() => setIsTypeModalOpen(false)}>Cancel</Button>
-            <Button onClick={() => createTypeMutation.mutate(newTypeName)} disabled={!newTypeName || createTypeMutation.isPending}>Create</Button>
-          </div>
-        </div>
-      </Modal>
-
-      <Modal isOpen={isModelModalOpen} onClose={() => setIsModelModalOpen(false)} title="Add Vehicle Model">
-        <div className="space-y-4">
-          <Input 
-            label="Model Name" 
-            value={newModelName} 
-            onChange={e => setNewModelName(e.target.value)} 
-            placeholder="e.g. Model S"
-            autoFocus
-          />
-          <Input 
-            label="Description (Optional)" 
-            value={newModelDesc} 
-            onChange={e => setNewModelDesc(e.target.value)} 
-          />
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="secondary" onClick={() => setIsModelModalOpen(false)}>Cancel</Button>
-            <Button onClick={() => createModelMutation.mutate({ name: newModelName, description: newModelDesc })} disabled={!newModelName || createModelMutation.isPending}>Create</Button>
-          </div>
-        </div>
-      </Modal>
     </PageWrapper>
   );
 }
@@ -271,3 +208,4 @@ export function CatalogPage() {
     </ComponentErrorBoundary>
   );
 }
+

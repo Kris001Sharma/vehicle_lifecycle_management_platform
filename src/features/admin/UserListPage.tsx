@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
-import { Card } from '@/components/ui/Card';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { supabase } from '@/lib/supabase/client';
-import { Users as UsersIcon, Mail, Phone, Shield, CheckCircle2, XCircle } from 'lucide-react';
+import { Mail, Shield, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 export function UserListPage() {
@@ -89,7 +88,7 @@ export function UserListPage() {
                     {new Date(u.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <Button variant="outline" size="sm">Edit</Button>
+                    <Button variant="secondary" size="sm">Edit</Button>
                   </td>
                 </tr>
               ))
