@@ -104,3 +104,4 @@ CREATE INDEX idx_vehicle_variants_powertrain
   ON public.vehicle_variants(powertrain_type_id);
 CREATE INDEX idx_tenant_catalog_config_tenant
   ON public.tenant_catalog_config(tenant_id);
+  
