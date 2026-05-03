@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/hooks/useToast';
 import { useFormDirtyBlocker } from '@/hooks/useFormDirtyBlocker';
 import { supabase } from '@/lib/supabase/client';
-import { ArrowLeft, Save, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Save, CheckCircle, AlertTriangle } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 
 export function ModelFormPage() {
@@ -25,7 +25,8 @@ export function ModelFormPage() {
 
   const [isDirty, setIsDirty] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const { reset: resetBlocker } = useFormDirtyBlocker(isDirty);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const { blocker, reset: resetBlocker } = useFormDirtyBlocker(isDirty);
 
   const [formData, setFormData] = useState({
     manufacturer: '',
@@ -35,7 +36,8 @@ export function ModelFormPage() {
     use_type: '' as 'personal' | 'commercial' | 'both' | '',
     year_from: new Date().getFullYear(),
     year_to: null as number | null,
-    description: ''
+    description: '',
+    is_active: true
   });
 
   const { data: categories, isLoading: categoriesLoading } = useQuery({
@@ -82,7 +84,8 @@ export function ModelFormPage() {
                       use_type: data.use_type || '',
                       year_from: data.year_from || new Date().getFullYear(),
                       year_to: data.year_to || null,
-                      description: data.description || ''
+                      description: data.description || '',
+                      is_active: data.is_active ?? true
                   });
               }
           });
@@ -101,13 +104,17 @@ export function ModelFormPage() {
             : createVehicleModel(data, tenantId!),
     onSuccess: () => {
         resetBlocker();
+        setIsConfirmModalOpen(false);
         queryClient.invalidateQueries({ queryKey: ['vehicle_models'] });
         setShowSuccessModal(true);
     },
-    onError: (err: any) => showToast(err.message, 'error')
+    onError: (err: any) => {
+        showToast(err.message, 'error');
+        setIsConfirmModalOpen(false);
+    }
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.category_id || !formData.use_type || !formData.manufacturer || !formData.name) {
         showToast('Please fill all required fields', 'error');
@@ -118,7 +125,16 @@ export function ModelFormPage() {
         showToast('Please select a vehicle type to continue', 'error');
         return;
     }
-    mutation.mutate(formData);
+    
+    if (isEdit) {
+        setIsConfirmModalOpen(true);
+    } else {
+        mutation.mutate(formData);
+    }
+  };
+
+  const confirmSave = () => {
+      mutation.mutate(formData);
   };
 
   return (
@@ -131,7 +147,7 @@ export function ModelFormPage() {
       }
     >
       <div className="space-y-8 pb-32">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={onSubmit} className="space-y-6">
           <Card className="p-6">
             <h2 className="text-lg font-semibold text-slate-900 border-b pb-2 mb-6">Model Details</h2>
             <div className="space-y-6">
@@ -257,17 +273,23 @@ export function ModelFormPage() {
                     onChange={e => handleFieldChange({ year_from: parseInt(e.target.value) })}
                     />
                     <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1 opacity-100 flex items-center h-[20px]">Discontinued in</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1 opacity-100 flex items-center h-[20px]">Discontinued on (Date)</label>
                     <input 
-                        type="number"
+                        type="date"
                         className="w-full h-10 px-3 bg-white border border-slate-200 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                        placeholder="Present"
-                        value={formData.year_to || ''}
-                        onChange={e => handleFieldChange({ year_to: e.target.value ? parseInt(e.target.value) : null })}
+                        value={formData.year_to ? `${formData.year_to}-12-31` : ''}
+                        onChange={e => {
+                            const val = e.target.value || null;
+                            const year = val ? new Date(val).getFullYear() : null;
+                            handleFieldChange({ 
+                                year_to: year,
+                                is_active: !year
+                            });
+                        }}
                     />
                     </div>
                 </div>
-                <p className="text-[11px] font-medium text-slate-500 mt-1">Leave 'to year' blank if this model is still currently available</p>
+                <p className="text-[11px] font-medium text-slate-500 mt-1">Leave blank if this model is still currently available. Stored as year in database.</p>
               </div>
 
               <div className="space-y-1">
@@ -303,6 +325,45 @@ export function ModelFormPage() {
             <Button className="w-full" onClick={() => navigate('/admin/catalog')}>
                 Go back to Models and Variants
             </Button>
+        </div>
+      </Modal>
+
+      {/* Navigation Blocker Confirmation */}
+      <Modal
+        isOpen={blocker.state === "blocked"}
+        onClose={() => blocker.reset?.()}
+        title="Unsaved Changes"
+      >
+        <div className="py-4">
+          <div className="flex items-center gap-3 p-3 bg-amber-50 text-amber-800 rounded-lg border border-amber-200 mb-6 text-sm">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+            <p>You have unsaved changes. Are you sure you want to leave this page? Your changes will be lost.</p>
+          </div>
+          <div className="flex justify-end gap-3 pt-6 border-t font-medium">
+            <Button variant="secondary" onClick={() => blocker.reset?.()}>Stay on Page</Button>
+            <Button variant="destructive" onClick={() => blocker.proceed?.()}>Discard and Leave</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Save Confirmation Modal */}
+      <Modal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        title="Confirm Model Update"
+      >
+        <div className="py-4">
+            <div className="flex items-center gap-3 p-3 bg-indigo-50 text-indigo-800 rounded-lg border border-indigo-200 mb-6 text-sm">
+                <AlertTriangle className="w-5 h-5 flex-shrink-0 text-indigo-500" />
+                <p>Are you sure you want to update this model card? This will change the details for all associated variants and historical records.</p>
+            </div>
+            
+            <div className="flex justify-end gap-3 pt-6 border-t">
+                <Button variant="secondary" onClick={() => setIsConfirmModalOpen(false)}>Review Changes</Button>
+                <Button disabled={mutation.isPending} onClick={confirmSave}>
+                    {mutation.isPending ? 'Saving...' : 'Confirm and Save'}
+                </Button>
+            </div>
         </div>
       </Modal>
     </PageWrapper>

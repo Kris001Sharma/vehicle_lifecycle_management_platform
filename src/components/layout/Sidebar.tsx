@@ -56,15 +56,15 @@ export function Sidebar({ role, navItems, currentPath }: SidebarProps) {
               </Link>
               
               {item.children && isActive && (
-                <div className="ml-9 space-y-1">
+                <div className="ml-9 space-y-1 mt-1 mb-4">
                   {item.children.map(child => (
                     <Link
                       key={child.path}
                       to={child.path}
                       className={cn(
-                        "block px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                        "block px-3 py-2 text-[13px] font-medium rounded-md transition-colors",
                         currentPath === child.path
-                          ? "text-white bg-slate-800"
+                          ? "text-white bg-slate-800 shadow-sm"
                           : "text-slate-400 hover:text-white hover:bg-slate-800/50"
                       )}
                     >

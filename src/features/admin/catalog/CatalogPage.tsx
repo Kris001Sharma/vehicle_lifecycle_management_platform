@@ -7,7 +7,7 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { Plus, Edit2, Search, ChevronDown, ChevronUp, Car } from 'lucide-react';
+import { Plus, Edit2, Search, ChevronDown, ChevronUp, Car, ExternalLink } from 'lucide-react';
 import { ComponentErrorBoundary } from '@/components/errors/ComponentErrorBoundary';
 import { supabase } from '@/lib/supabase/client';
 
@@ -37,8 +37,9 @@ function CatalogContent() {
 
   const filteredModels = useMemo(() => {
     return models.filter(m => 
-      m.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-      m.manufacturer?.toLowerCase().includes(searchQuery.toLowerCase())
+      (m.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      m.manufacturer?.toLowerCase().includes(searchQuery.toLowerCase())) &&
+      m.status !== 'discontinued' && m.is_active !== false
     );
   }, [models, searchQuery]);
 
@@ -133,7 +134,6 @@ function CatalogContent() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {catModels.map((model: any) => {
                             const modelVariants = variants.filter((v: any) => v.model_id === model.id);
-                            const powertrainsList = Array.from(new Set(modelVariants.map((v: any) => v.powertrain?.display_label).filter(Boolean)));
                             
                             const useTypeClass = {
                                 personal: 'bg-blue-50 text-blue-700',
@@ -161,34 +161,48 @@ function CatalogContent() {
 
                                     <div className="flex-1">
                                         {modelVariants.length === 0 ? (
-                                            <div className="bg-amber-50 rounded p-2 text-xs text-amber-700 border border-amber-100/50 mb-3">
+                                            <div className="bg-amber-50 rounded p-3 text-xs text-amber-700 border border-amber-100/50 mb-4">
                                                 No variants — this model cannot be used in sales until a variant is added.
                                             </div>
                                         ) : (
-                                            <div className="space-y-3 mb-3">
-                                                <div className="text-sm text-slate-500">
-                                                    {modelVariants.length} variant{modelVariants.length === 1 ? '' : 's'}
+                                            <div className="space-y-4 mb-4">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Available Variants</span>
+                                                    <Badge variant="neutral" className="bg-slate-100 text-slate-600 border-none">{modelVariants.length}</Badge>
                                                 </div>
-                                                {powertrainsList.length > 0 && (
-                                                    <div className="flex flex-wrap gap-1">
-                                                        {powertrainsList.map((pt: any) => (
-                                                            <span key={pt} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
-                                                                {pt}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                )}
+                                                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                                    {modelVariants.map((v: any) => (
+                                                        <div 
+                                                            key={v.id} 
+                                                            onClick={() => navigate(`/admin/catalog/variants/${v.id}/edit`)}
+                                                            className="flex items-center justify-between p-2 rounded-md bg-slate-50 border border-transparent hover:border-slate-200 hover:bg-slate-100 cursor-pointer transition-all group/v"
+                                                        >
+                                                            <div className="flex flex-col">
+                                                                <span className="text-sm font-medium text-slate-700">{v.name}</span>
+                                                                <span className="text-[10px] text-slate-400 uppercase tracking-tighter">{v.powertrain?.display_label}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge variant={v.status === 'active' ? 'success' : v.status === 'draft' ? 'neutral' : 'error'} className="text-[9px] px-1.5 py-0 leading-none">
+                                                                    {v.status}
+                                                                </Badge>
+                                                                <ExternalLink className="w-3 h-3 text-slate-400 opacity-0 group-hover/v:opacity-100 transition-opacity" />
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
 
                                     <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end gap-2 items-center">
-                                        <Button size="sm" variant="secondary" onClick={() => navigate(`/admin/catalog/variants/new?model_id=${model.id}`)}>
-                                            <Plus className="w-3 h-3" /> Add variant
-                                        </Button>
-                                        <Button variant="ghost" size="sm" onClick={() => navigate(`/admin/catalog/models/${model.id}/edit`)}>
-                                            <Edit2 className="w-4 h-4" />
-                                        </Button>
+                                        <div className="flex gap-2">
+                                            <Button variant="secondary" size="sm" onClick={() => navigate(`/admin/catalog/models/${model.id}/edit`)}>
+                                                <Edit2 className="w-3.5 h-3.5 mr-1" /> Edit Model
+                                            </Button>
+                                            <Button size="sm" onClick={() => navigate(`/admin/catalog/variants/new?model_id=${model.id}`)}>
+                                                <Plus className="w-3.5 h-3.5 mr-1" /> Add Variant
+                                            </Button>
+                                        </div>
                                     </div>
                                 </div>
                             )

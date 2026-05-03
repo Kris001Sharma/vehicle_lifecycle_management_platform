@@ -87,6 +87,16 @@ export async function updateVehicleModel(modelId: string, data: any, tenantId: s
         .select()
         .single();
     if (error) throw error;
+
+    // If model is discontinued (not active), discontinue all its variants
+    if (data.is_active === false || data.year_to) {
+        await (supabase as any)
+            .from('vehicle_variants')
+            .update({ status: 'discontinued' })
+            .eq('model_id', modelId)
+            .eq('tenant_id', tenantId);
+    }
+
     return result;
 }
 
