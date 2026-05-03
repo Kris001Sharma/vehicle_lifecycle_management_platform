@@ -14,23 +14,15 @@ function mapAuthError(error: any): string {
   return 'Sign in failed. Please try again.';
 }
 
-export const loginAction = async (email: string, password: string, turnstileToken: string) => {
+export const loginAction = async (email: string, password: string) => {
   try {
-    // 1. Verify Turnstile
-    const { data: turnstileData, error: turnstileError } = await supabase.functions.invoke('verify-turnstile', {
-      body: { token: turnstileToken }
-    });
-    
-    if (turnstileError) {
-      console.error('Turnstile verification invocation error:', turnstileError);
-      return { success: false, error: 'Security check failed. Please refresh and retry.' };
-    }
-
-    if (!turnstileData?.valid) {
-      console.error('Turnstile verification failed response:', turnstileData);
-      const errorMsg = turnstileData?.error ? `: ${turnstileData.error}` : '';
-      return { success: false, error: `Security check failed${errorMsg}. Please try again.` };
-    }
+    // TURNSTILE: Bot verification removed temporarily.
+    // Re-implement using a Cloudflare Worker for siteverify
+    // when ready. The site key (VITE_TURNSTILE_SITE_KEY) and
+    // secret key (TURNSTILE_SECRET_KEY in Edge Function secrets)
+    // are already configured and can be reused.
+    // Do not use a Supabase Edge Function for this —
+    // Cloudflare blocks requests from Deno Deploy IP ranges.
 
     // Attempt to get IP from client headers (not always reliable in browser, but best effort)
     const ipResponse = await fetch('https://api.ipify.org?format=json').catch(() => null);
