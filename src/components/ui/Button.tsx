@@ -37,7 +37,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {isLoading && <Spinner size="sm" className="mr-2 border-current border-t-transparent" />}
-        <span className={cn(isLoading && 'opacity-0')}>{children}</span>
+        <span className={cn('inline-flex items-center justify-center gap-2', isLoading && 'opacity-0')}>{children}</span>
       </button>
     );
   }

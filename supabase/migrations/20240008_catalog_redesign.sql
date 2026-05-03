@@ -44,6 +44,7 @@ CREATE TABLE public.tenant_catalog_config (
     REFERENCES public.tenants(id) ON DELETE CASCADE,
   enabled_category_ids UUID[] NOT NULL DEFAULT '{}',
   enabled_powertrain_ids UUID[] NOT NULL DEFAULT '{}',
+  manufacturers TEXT[] NOT NULL DEFAULT '{}',
   regulatory_market TEXT NOT NULL DEFAULT 'IN',
   currency TEXT NOT NULL DEFAULT 'INR',
   default_service_interval_km INT,
@@ -105,3 +106,6 @@ CREATE INDEX idx_vehicle_variants_powertrain
 CREATE INDEX idx_tenant_catalog_config_tenant
   ON public.tenant_catalog_config(tenant_id);
   
+ALTER TABLE IF EXISTS public.tenant_catalog_config 
+  ADD COLUMN IF NOT EXISTS manufacturers TEXT[] NOT NULL DEFAULT '{}';
+

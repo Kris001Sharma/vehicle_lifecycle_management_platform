@@ -7,15 +7,20 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Switch } from '@/components/ui/Switch';
 import { useToast } from '@/hooks/useToast';
-import { Save, Info } from 'lucide-react';
+import { Save, Info, X, ChevronLeft } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase/client';
+import { SEEDED_MANUFACTURERS } from '@/constants/manufacturers';
 
 export function CatalogSettingsPage() {
   const user = useAuthStore(s => s.user);
   const tenantId = user?.tenantId;
   const { showToast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  const [newManufacturer, setNewManufacturer] = useState('');
 
   const { data: categories = [], isLoading: categoriesLoading } = useQuery({
     queryKey: ['vehicle_categories'],
@@ -52,6 +57,7 @@ export function CatalogSettingsPage() {
   const [formState, setFormState] = useState({
     enabled_category_ids: [] as string[],
     enabled_powertrain_ids: [] as string[],
+    manufacturers: [] as string[],
     default_service_interval_km: 10000,
     default_service_interval_months: 6,
     regulatory_market: 'IN',
@@ -63,6 +69,7 @@ export function CatalogSettingsPage() {
       setFormState({
         enabled_category_ids: config.enabled_category_ids || [],
         enabled_powertrain_ids: config.enabled_powertrain_ids || [],
+        manufacturers: config.manufacturers || [],
         default_service_interval_km: config.default_service_interval_km || 10000,
         default_service_interval_months: config.default_service_interval_months || 6,
         regulatory_market: config.regulatory_market || 'IN',
@@ -116,6 +123,26 @@ export function CatalogSettingsPage() {
     });
   };
 
+  const addManufacturer = () => {
+      if (!newManufacturer.trim()) return;
+      if (formState.manufacturers.includes(newManufacturer.trim())) {
+          showToast('Manufacturer already exists', 'error');
+          return;
+      }
+      setFormState(prev => ({
+          ...prev,
+          manufacturers: [...prev.manufacturers, newManufacturer.trim()]
+      }));
+      setNewManufacturer('');
+  };
+
+  const removeManufacturer = (name: string) => {
+      setFormState(prev => ({
+          ...prev,
+          manufacturers: prev.manufacturers.filter(m => m !== name)
+      }));
+  };
+
   if (configLoading || categoriesLoading || powertrainsLoading) {
       return (
           <PageWrapper title="Catalog Settings">
@@ -128,7 +155,15 @@ export function CatalogSettingsPage() {
   }
 
   return (
-    <PageWrapper title="Catalog Settings">
+    <PageWrapper 
+      title="Catalog Settings"
+      actions={
+        <Button variant="secondary" onClick={() => navigate('/admin')} className="h-9">
+          <ChevronLeft className="w-4 h-4" />
+          Back to Dashboard
+        </Button>
+      }
+    >
       <div className="max-w-4xl space-y-8 pb-20">
         {/* Section 1: Categories */}
         <section>
@@ -196,7 +231,55 @@ export function CatalogSettingsPage() {
           </div>
         </section>
 
-        {/* Section 3: Defaults */}
+        {/* Section 3: Manufacturers */}
+        <section>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Supported Manufacturers</h2>
+              <p className="text-sm text-slate-500">Add the manufacturers your dealership handles. These will appear in the model creation form.</p>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-lg p-6">
+            <div className="flex gap-2 mb-6">
+                <div className="flex-1">
+                    <Input 
+                        placeholder="Enter manufacturer name (e.g. Tata, Mahindra)"
+                        value={newManufacturer}
+                        onChange={e => setNewManufacturer(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addManufacturer())}
+                        list="seeded-manufacturers"
+                    />
+                    <datalist id="seeded-manufacturers">
+                        {SEEDED_MANUFACTURERS.map(m => (
+                            <option key={m} value={m} />
+                        ))}
+                    </datalist>
+                </div>
+                <Button variant="secondary" className="h-10" onClick={addManufacturer}>Add</Button>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+                {formState.manufacturers.length === 0 ? (
+                    <div className="text-sm text-slate-400 italic py-2">No manufacturers added yet. Add one above.</div>
+                ) : (
+                    formState.manufacturers.map((m: string) => (
+                        <div key={m} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-sm font-medium group hover:bg-slate-200 transition-colors">
+                            {m}
+                            <button 
+                                onClick={() => removeManufacturer(m)}
+                                className="text-slate-400 hover:text-red-500 transition-colors"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    ))
+                )}
+            </div>
+          </div>
+        </section>
+
+        {/* Section 4: Defaults */}
         <section className="bg-white p-6 rounded-lg border border-slate-200">
             <h2 className="text-lg font-semibold text-slate-900 mb-1">Defaults</h2>
             <p className="text-sm text-slate-500 mb-6">Default service schedule applied to new variants.</p>
@@ -257,7 +340,7 @@ export function CatalogSettingsPage() {
         <div className="flex justify-end gap-3 p-6 bg-slate-50 border-t border-slate-200 rounded-b-lg -mx-0">
           <Button variant="secondary" onClick={() => window.history.back()}>Cancel</Button>
           <Button disabled={mutation.isPending} onClick={() => mutation.mutate(formState)}>
-            <Save className="w-4 h-4 mr-2" />
+            <Save className="w-4 h-4" />
             {mutation.isPending ? 'Saving...' : 'Save Settings'}
           </Button>
         </div>
