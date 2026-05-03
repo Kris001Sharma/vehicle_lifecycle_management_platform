@@ -26,6 +26,7 @@ export async function getTenantCatalogConfig(tenantId: string): Promise<any | nu
     .select('*')
     .eq('tenant_id', tenantId)
     .maybeSingle();
+  
   if (error) throw error;
   return data;
 }
@@ -60,6 +61,11 @@ export async function getEnabledPowertrainTypes(tenantId: string): Promise<any[]
     }
     
     return allPowertrains.filter(p => config.enabled_powertrain_ids.includes(p.id));
+}
+
+export async function getEnabledManufacturers(tenantId: string): Promise<string[]> {
+    const config = await getTenantCatalogConfig(tenantId);
+    return config?.manufacturers || [];
 }
 
 export async function createVehicleModel(data: any, tenantId: string): Promise<any> {
@@ -267,4 +273,34 @@ export async function getVariantWithDetails(variantId: string, _tenantId: string
     })) || [];
     
     return { ...data, features: flattenedFeatures };
+}
+
+export async function getFeaturesByType(vehicleTypeId: string | null, tenantId: string): Promise<any[]> {
+    let query = (supabase as any)
+      .from('features')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('category')
+      .order('name');
+      
+    if (vehicleTypeId) {
+      query = query.or(`vehicle_type_id.eq.${vehicleTypeId},vehicle_type_id.is.null`);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return data;
+}
+
+export async function createFeature(
+    data: { name: string; category: string; vehicle_type_id?: string | null; is_default_standard?: boolean }, 
+    tenantId: string
+): Promise<any> {
+    const { data: result, error } = await (supabase as any)
+      .from('features')
+      .insert({ ...data, tenant_id: tenantId })
+      .select()
+      .single();
+    if (error) throw error;
+    return result;
 }

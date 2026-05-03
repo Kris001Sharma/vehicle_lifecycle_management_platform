@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS public.vehicle_models (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES public.tenants(id)
     ON DELETE CASCADE,
-  type_id UUID NOT NULL REFERENCES public.vehicle_types(id)
+  type_id UUID REFERENCES public.vehicle_types(id)
     ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
@@ -366,3 +366,6 @@ EXCEPTION
   WHEN OTHERS THEN
     -- Ignore if pg_cron is not available
 END $$;
+
+ALTER TABLE IF EXISTS public.vehicle_models ALTER COLUMN type_id DROP NOT NULL;
+

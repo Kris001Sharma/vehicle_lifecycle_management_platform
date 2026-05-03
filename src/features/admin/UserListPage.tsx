@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { supabase } from '@/lib/supabase/client';
-import { Mail, Shield, CheckCircle2, XCircle } from 'lucide-react';
+import { Mail, Shield, CheckCircle2, XCircle, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
 export function UserListPage() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const user = useAuthStore(s => s.user);
@@ -34,7 +36,14 @@ export function UserListPage() {
   }, [tenantId]);
 
   return (
-    <PageWrapper title="User Management">
+    <PageWrapper 
+      title="User Management"
+      actions={
+        <Button variant="secondary" onClick={() => navigate('/admin')}>
+            <ArrowLeft className="w-4 h-4" /> Back
+        </Button>
+      }
+    >
       <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 border-b border-slate-200 text-slate-500">

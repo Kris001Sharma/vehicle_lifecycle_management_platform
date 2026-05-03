@@ -74,7 +74,7 @@ function CatalogContent() {
       actions={
         <div className="flex gap-2">
           <Button onClick={() => navigate('/admin/catalog/models/new')}>
-            <Plus className="w-4 h-4 mr-2" /> Add model
+            <Plus className="w-4 h-4" /> Add model
           </Button>
         </div>
       }
@@ -98,7 +98,7 @@ function CatalogContent() {
                 <h3 className="text-slate-900 font-bold text-xl">No models yet</h3>
                 <p className="text-slate-500 mt-2 max-w-sm mb-6">Start by adding your first vehicle model. Each model can have multiple variants with different specifications.</p>
                 <Button onClick={() => navigate('/admin/catalog/models/new')}>
-                    <Plus className="w-4 h-4 mr-2" /> Add your first model
+                    <Plus className="w-4 h-4" /> Add your first model
                 </Button>
             </div>
         )}
@@ -179,7 +179,7 @@ function CatalogContent() {
 
                                     <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end gap-2 items-center">
                                         <Button size="sm" variant="secondary" onClick={() => navigate(`/admin/catalog/variants/new?model_id=${model.id}`)}>
-                                            <Plus className="w-3 h-3 mr-1" /> Add variant
+                                            <Plus className="w-3 h-3" /> Add variant
                                         </Button>
                                         <Button variant="ghost" size="sm" onClick={() => navigate(`/admin/catalog/models/${model.id}/edit`)}>
                                             <Edit2 className="w-4 h-4" />

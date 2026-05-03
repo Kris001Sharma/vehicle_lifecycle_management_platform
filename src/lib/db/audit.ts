@@ -13,7 +13,7 @@ export async function getAuditLogs(tenantId: string, filters: AuditLogFilter, pa
   const to = from + pageSize - 1;
 
   async function performQuery() {
-    let query: any = supabase.from('audit_logs').select('*', { count: 'exact' });
+    let query = (supabase as any).from('audit_logs').select('*', { count: 'exact' });
 
     query = query.eq('tenant_id', tenantId);
 

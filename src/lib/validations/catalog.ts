@@ -6,7 +6,8 @@ export const vehicleTypeSchema = z.object({
 
 export const vehicleModelSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  type_id: z.string().uuid('Valid type is required'),
+  category_id: z.string().uuid('Valid category is required'),
+  type_id: z.string().uuid().optional().nullable(),
   description: z.string().optional(),
 });
 
