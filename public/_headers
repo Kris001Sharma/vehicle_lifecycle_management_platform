@@ -3,7 +3,6 @@
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=()
-  X-XSS-Protection: 1; mode=block
 
 /index.html
-  Content-Security-Policy: default-src 'self' https://challenges.cloudflare.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com https://*.cloudflare.com blob:; style-src 'self' 'unsafe-inline' https://challenges.cloudflare.com; img-src 'self' data: blob: res.cloudinary.com *.r2.cloudflarestorage.com https://pub-5331c57422b1468a849d6ef3a0903161.r2.dev; connect-src 'self' https://myjpkzjowzpsfixfohew.supabase.co api.cloudinary.com https://challenges.cloudflare.com https://*.cloudflare.com https://api.ipify.org blob:; frame-src 'self' https://challenges.cloudflare.com; object-src 'none'; base-uri 'self';
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: res.cloudinary.com https:; connect-src 'self' https://*.supabase.co https://api.cloudinary.com; object-src 'none'; base-uri 'self';
