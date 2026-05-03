@@ -53,6 +53,10 @@ The catalog has three levels:
 3. Fill in the manufacturer name. You can type any name — common manufacturers appear as suggestions.
 4. Enter the model name exactly as it should appear in records (e.g. "Ace EV", "Innova Crysta").
 5. Select the vehicle category by clicking the appropriate card (e.g. "Light Commercial Vehicle").
+
+**Step 5a — Vehicle type (subcategory)**
+After selecting a vehicle category, a row of options will appear labelled "Vehicle type". Select the option that most closely describes this model. Example: if you selected "Light Commercial Vehicle", you will then choose from options like Minivan, Mini Truck, Pickup Truck, and so on. This selection determines which specification fields appear when you add variants to this model. Construction & Special Purpose vehicles are not yet available — contact your administrator if you need to add this category.
+
 6. Select the use type: Personal, Commercial, or Both.
 7. Enter the model year (the year this model was launched). Leave "Year to" blank if the model is still current.
 8. Add a description if needed (optional).

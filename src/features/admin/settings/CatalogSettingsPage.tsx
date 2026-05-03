@@ -164,7 +164,7 @@ export function CatalogSettingsPage() {
         </Button>
       }
     >
-      <div className="max-w-4xl space-y-8 pb-20">
+      <div className="space-y-8 pb-20">
         {/* Section 1: Categories */}
         <section>
           <div className="mb-4">

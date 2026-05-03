@@ -11,7 +11,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/hooks/useToast';
 import { useFormDirtyBlocker } from '@/hooks/useFormDirtyBlocker';
 import { supabase } from '@/lib/supabase/client';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, CheckCircle } from 'lucide-react';
+import { Modal } from '@/components/ui/Modal';
 
 export function ModelFormPage() {
   const { modelId } = useParams();
@@ -23,12 +24,14 @@ export function ModelFormPage() {
   const tenantId = user?.tenantId;
 
   const [isDirty, setIsDirty] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const { reset: resetBlocker } = useFormDirtyBlocker(isDirty);
 
   const [formData, setFormData] = useState({
     manufacturer: '',
     name: '',
     category_id: '',
+    subcategory: null as string | null,
     use_type: '' as 'personal' | 'commercial' | 'both' | '',
     year_from: new Date().getFullYear(),
     year_to: null as number | null,
@@ -41,6 +44,21 @@ export function ModelFormPage() {
     enabled: !!tenantId,
   });
   
+  const selectedCategory = categories?.find((c: any) => c.id === formData.category_id);
+  const subcategories = selectedCategory?.subcategories || [];
+  
+  const showSubcategories = subcategories.length > 0;
+  
+  // Custom description mapping
+  const categoryDescriptions: Record<string, string> = {
+    'two-wheeler': 'Motorcycles, scooters, mopeds, electric bicycles',
+    'three-wheeler': 'Auto-rickshaws, cargo three-wheelers',
+    'passenger-car': 'Hatchbacks, sedans, SUVs, MUVs, MPVs, crossovers',
+    'lcv': 'Minivans, mini trucks, pickup trucks, cargo vans, school vans, ambulances',
+    'mhcv': 'City buses, intercity buses, school buses, rigid trucks, tippers',
+    'construction-special': 'Excavators, loaders, tractors (coming soon)',
+  };
+
   const { data: config } = useQuery({
     queryKey: ['tenant_catalog_config', tenantId],
     queryFn: () => getTenantCatalogConfig(tenantId!),
@@ -60,6 +78,7 @@ export function ModelFormPage() {
                       manufacturer: data.manufacturer || '',
                       name: data.name || '',
                       category_id: data.category_id || '',
+                      subcategory: data.subcategory || null,
                       use_type: data.use_type || '',
                       year_from: data.year_from || new Date().getFullYear(),
                       year_to: data.year_to || null,
@@ -82,9 +101,8 @@ export function ModelFormPage() {
             : createVehicleModel(data, tenantId!),
     onSuccess: () => {
         resetBlocker();
-        showToast('Model saved. Now add a variant to make it available for sales.', 'success');
         queryClient.invalidateQueries({ queryKey: ['vehicle_models'] });
-        navigate('/admin/catalog');
+        setShowSuccessModal(true);
     },
     onError: (err: any) => showToast(err.message, 'error')
   });
@@ -93,6 +111,11 @@ export function ModelFormPage() {
     e.preventDefault();
     if (!formData.category_id || !formData.use_type || !formData.manufacturer || !formData.name) {
         showToast('Please fill all required fields', 'error');
+        return;
+    }
+    const catObj = categories?.find((c: any) => c.id === formData.category_id);
+    if (catObj && catObj.subcategories?.length > 0 && !formData.subcategory) {
+        showToast('Please select a vehicle type to continue', 'error');
         return;
     }
     mutation.mutate(formData);
@@ -107,7 +130,7 @@ export function ModelFormPage() {
         </Button>
       }
     >
-      <div className="max-w-3xl mx-auto space-y-8 pb-32">
+      <div className="space-y-8 pb-32">
         <form onSubmit={handleSubmit} className="space-y-6">
           <Card className="p-6">
             <h2 className="text-lg font-semibold text-slate-900 border-b pb-2 mb-6">Model Details</h2>
@@ -147,18 +170,66 @@ export function ModelFormPage() {
                         <Skeleton className="h-[76px] w-full rounded-lg" />
                         <Skeleton className="h-[76px] w-full rounded-lg" />
                       </>
-                  ) : categories?.map(cat => (
+                  ) : categories?.map(cat => {
+                    const isConstruction = cat.slug === 'construction-special';
+                    return (
                     <div 
                       key={cat.id}
-                      onClick={() => handleFieldChange({ category_id: cat.id })}
-                      className={`p-3 rounded-lg border cursor-pointer transition-all ${formData.category_id === cat.id ? 'border-indigo-600 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'}`}
+                      onClick={(e) => {
+                        if (isConstruction) {
+                          e.preventDefault();
+                          return;
+                        }
+                        handleFieldChange({ category_id: cat.id, subcategory: null });
+                      }}
+                      className={`relative p-3 rounded-lg border transition-all ${
+                        isConstruction 
+                          ? 'opacity-50 cursor-not-allowed border-slate-200 bg-slate-50'
+                          : formData.category_id === cat.id 
+                            ? 'border-indigo-600 bg-indigo-50 shadow-sm cursor-pointer' 
+                            : 'border-slate-200 bg-white hover:border-slate-300 cursor-pointer'
+                      }`}
                     >
+                      {isConstruction && (
+                        <div className="absolute top-2 right-2 text-[10px] uppercase font-bold tracking-wide bg-slate-200 text-slate-500 px-2 py-0.5 rounded">
+                          Coming soon
+                        </div>
+                      )}
                       <div className="font-medium text-slate-900">{cat.name}</div>
-                      <div className="text-xs text-slate-500 mt-0.5">{cat.description}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        {categoryDescriptions[cat.slug] || cat.description}
+                      </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               </div>
+
+              {showSubcategories && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Vehicle type *</label>
+                  <div className="flex flex-wrap gap-2">
+                    {subcategories.map((sub: any) => (
+                      <button
+                        key={sub.slug}
+                        type="button"
+                        onClick={() => handleFieldChange({ subcategory: sub.slug })}
+                        className={`px-3 py-1.5 border rounded-full text-sm transition-colors ${
+                          formData.subcategory === sub.slug
+                            ? 'border-indigo-600 bg-indigo-600 text-white'
+                            : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400'
+                        }`}
+                      >
+                        {sub.label}
+                      </button>
+                    ))}
+                  </div>
+                  {!formData.subcategory && (
+                    <p className="text-red-500 text-[11px] font-medium mt-2">
+                      Please select a vehicle type to continue.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-3">Primary use *</label>
@@ -222,6 +293,18 @@ export function ModelFormPage() {
           </div>
         </form>
       </div>
+
+      <Modal isOpen={showSuccessModal} onClose={() => {}} title="Vehicle Saved">
+        <div className="py-2 text-center">
+            <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="w-6 h-6" />
+            </div>
+            <p className="text-slate-500 mb-6 font-medium">Model details have been saved successfully.</p>
+            <Button className="w-full" onClick={() => navigate('/admin/catalog')}>
+                Go back to Models and Variants
+            </Button>
+        </div>
+      </Modal>
     </PageWrapper>
   );
 }

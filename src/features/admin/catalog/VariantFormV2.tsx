@@ -67,11 +67,12 @@ export function VariantFormV2() {
   });
   
   const categorySlug = currentModel?.category?.slug || '';
+  const subcategorySlug = currentModel?.subcategory || null;
 
   // Get field definitions
   const specFields = useMemo(() => 
-    selectedPowertrain ? getSpecFields(categorySlug, selectedPowertrain.slug) : [],
-    [categorySlug, selectedPowertrain]
+    selectedPowertrain ? getSpecFields(categorySlug, subcategorySlug, selectedPowertrain.slug) : [],
+    [categorySlug, subcategorySlug, selectedPowertrain]
   );
 
   // Form setup
@@ -195,6 +196,10 @@ export function VariantFormV2() {
       });
   };
 
+  const specHeadingPrefix = currentModel?.subcategory ? 
+      (currentModel.category?.subcategories?.find((s: any) => s.slug === currentModel.subcategory)?.label || currentModel.category?.name)
+      : currentModel?.category?.name;
+
   return (
     <PageWrapper 
       title={isEdit ? "Edit Variant" : "Add Variant"}
@@ -204,7 +209,7 @@ export function VariantFormV2() {
         </Button>
       }
     >
-      <div className="max-w-4xl space-y-8 pb-32">
+      <div className="space-y-8 pb-32">
         {/* Section A: Identity */}
         <Card className="p-6">
           <h2 className="text-lg font-semibold mb-4 text-slate-900 border-b pb-2">Variant Identity</h2>
@@ -267,7 +272,9 @@ export function VariantFormV2() {
         {selectedPowertrainId && (
           <div className="space-y-8">
             <Card className="p-6">
-                <h2 className="text-lg font-semibold text-slate-900 mb-6 border-b pb-2">Specifications: {selectedPowertrain?.display_label}</h2>
+                <h2 className="text-lg font-semibold text-slate-900 mb-6 border-b pb-2">
+                    {specHeadingPrefix ? `${specHeadingPrefix} specifications` : `Specifications: ${selectedPowertrain?.display_label}`}
+                </h2>
                 <div className="space-y-8">
                     {Object.entries(groupedFields).map(([group, fields]) => (
                         <div key={group}>
@@ -532,8 +539,8 @@ export function VariantFormV2() {
         </Modal>
 
         {/* Sticky Bottom Bar */}
-        <div className="fixed bottom-0 left-0 right-0 lg:left-64 bg-white/80 backdrop-blur-md border-t border-slate-200 p-4 z-50">
-            <div className="max-w-4xl mx-auto flex justify-between items-center px-4">
+        <div className="fixed bottom-0 left-0 right-0 lg:left-64 bg-white/80 backdrop-blur-md border-t border-slate-200 py-4 px-6 lg:px-8 z-50">
+            <div className="max-w-7xl mx-auto flex justify-between items-center w-full">
                 <Button variant="secondary" onClick={() => navigate('/admin/catalog')}>Discard Changes</Button>
                 <div className="flex gap-3">
                     <Button variant="secondary" disabled={mutation.isPending} onClick={() => onSave('draft')}>

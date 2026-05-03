@@ -79,7 +79,7 @@ function CatalogContent() {
         </div>
       }
     >
-      <div className="max-w-6xl space-y-8">
+      <div className="space-y-8">
         {/* Search Bar */}
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -148,6 +148,11 @@ function CatalogContent() {
                                             <h3 className="text-base font-semibold text-slate-900">
                                                 {model.manufacturer} {model.name}
                                             </h3>
+                                            <div className="text-xs text-slate-500 mt-0.5">
+                                                {model.subcategory 
+                                                    ? (model.category?.subcategories?.find((s: any) => s.slug === model.subcategory)?.label || model.category?.name)
+                                                    : model.category?.name}
+                                            </div>
                                         </div>
                                         <div className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${useTypeClass}`}>
                                             {model.use_type}
