@@ -1,5 +1,22 @@
 # Changelog
 
+## [Catalog redesign] — Multi-category catalog system
+- Migrated vehicle_types to vehicle_categories + powertrain_types global tables with seed data
+- Created tenant_catalog_config for admin-managed settings
+- Promoted gvw_kg, seating_capacity to queryable columns
+- Built dynamic spec schema system (getSpecSchema, getSpecFields) covering all category + powertrain combos
+- Redesigned model creation form with manufacturer autocomplete and category card selector
+- Redesigned variant form with dynamic section rendering driven by category and powertrain selection
+- Redesigned catalog overview with category-grouped layout
+- Created docs/USER_MANUAL.md with admin catalog section
+
+## [Phase 7] — Admin portal: catalog management
+- Built catalog CRUD: types, models, variants, features
+- Implemented discriminated spec schemas (electric vs diesel)
+- Implemented clone and discontinue variant with validations
+- Implemented variant sold-vehicle guard on edit
+- Built toast notification system
+
 ## [Security phase] — Security hardening
 - Added _headers file with CSP and security headers
 - Integrated Cloudflare Turnstile bot protection on login

@@ -249,6 +249,52 @@ export interface Database {
           updated_at?: string
         }
       }
+      features: {
+        Row: {
+          id: string
+          tenant_id: string
+          vehicle_type_id: string | null
+          name: string
+          category: string
+          is_default_standard: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          vehicle_type_id?: string | null
+          name: string
+          category: string
+          is_default_standard?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          vehicle_type_id?: string | null
+          name?: string
+          category?: string
+          is_default_standard?: boolean
+          created_at?: string
+        }
+      }
+      variant_default_features: {
+        Row: {
+          variant_id: string
+          feature_id: string
+          is_standard: boolean
+        }
+        Insert: {
+          variant_id: string
+          feature_id: string
+          is_standard?: boolean
+        }
+        Update: {
+          variant_id?: string
+          feature_id?: string
+          is_standard?: boolean
+        }
+      }
       service_records: {
         Row: {
           id: string
@@ -302,6 +348,18 @@ export interface Database {
           updated_at?: string
         }
       }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      user_role: "admin" | "sales" | "service"
+    }
+    CompositeTypes: {
+      [_ in never]: never
     }
   }
 }
