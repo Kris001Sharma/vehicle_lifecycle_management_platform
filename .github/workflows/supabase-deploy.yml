@@ -7,14 +7,17 @@ on:
     paths:
       - 'supabase/migrations/**' # Only runs if a migration file is added/changed
 
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - uses: supabase/setup-cli@v1
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
         with:
           version: latest
 
@@ -30,6 +33,12 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
       - name: Deploy Edge Functions
-        run: supabase functions deploy --no-verify-jwt
+        run: |
+          # Use find to check for subdirectories in supabase/functions to avoid failure if directory is empty or missing
+          if [ -d "supabase/functions" ] && [ "$(find supabase/functions -maxdepth 1 -type d ! -name 'functions' ! -name '_shared' | wc -l)" -gt 0 ]; then
+            supabase functions deploy --no-verify-jwt
+          else
+            echo "No functions to deploy."
+          fi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
