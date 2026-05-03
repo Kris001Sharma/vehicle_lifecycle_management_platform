@@ -291,8 +291,8 @@ CREATE TABLE IF NOT EXISTS public.attachments (
 -- audit_logs table
 CREATE TABLE IF NOT EXISTS public.audit_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tenant_id UUID,
-  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  tenant_id UUID REFERENCES public.tenants(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES public.user_profiles(id) ON DELETE SET NULL,
   action TEXT NOT NULL CHECK (action IN
     ('INSERT', 'UPDATE', 'DELETE', 'SELECT')),
   table_name TEXT NOT NULL,

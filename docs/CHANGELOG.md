@@ -1,5 +1,12 @@
 # Changelog
 
+## [Phase 7] — Admin portal: catalog management
+- Built catalog CRUD: types, models, variants, features
+- Implemented discriminated spec schemas (electric vs diesel)
+- Implemented clone and discontinue variant with validations
+- Implemented variant sold-vehicle guard on edit
+- Built toast notification system
+
 ## [Security phase] — Security hardening
 - Added _headers file with CSP and security headers
 - Integrated Cloudflare Turnstile bot protection on login

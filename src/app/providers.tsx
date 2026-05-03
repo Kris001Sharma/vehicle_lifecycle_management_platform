@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RootErrorBoundary } from '@/components/errors/RootErrorBoundary';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { RefreshCcw } from 'lucide-react';
+import { ToastContainer } from '@/components/ui/Toast';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,7 +46,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <RootErrorBoundary>
       <QueryClientProvider client={queryClient}>
         {children}
+        <ToastContainer />
       </QueryClientProvider>
     </RootErrorBoundary>
   );
 }
+

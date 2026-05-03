@@ -49,3 +49,8 @@ More tables will be added over subsequent phases.
 - Accent hover: indigo-700
 - Typography: system-ui stack
 - Spacing: p-6 on desktop, p-4 on mobile, space-y-6 section gaps.
+
+## Catalog Management
+- **Dependent Query Pattern**: Implemented cascading queries for Catalog items. Selecting a vehicle type loads mapped models, selecting a model loads variants in a three-column layout.
+- **Discriminated Union Zod Schema**: The `variantSchema` dynamically validates specific electric vs diesel features based on the `vehicle_type_slug` attribute.
+- **Transactions & Guardrails**: Validations dictate that modifying features or specs on a variant containing sold active vehicles results in rejection. Clone variations are prompted.

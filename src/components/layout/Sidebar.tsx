@@ -30,7 +30,9 @@ export function Sidebar({ role, navItems, currentPath }: SidebarProps) {
       
       <nav className="flex-1 px-4 space-y-1">
         {navItems.map((item) => {
-          const isActive = currentPath === item.path || currentPath.startsWith(`${item.path}/`);
+          const isActive = item.path === '/admin' 
+            ? currentPath === '/admin' 
+            : currentPath === item.path || currentPath.startsWith(`${item.path}/`);
           const Icon = item.icon;
           
           return (
