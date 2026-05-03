@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/Input';
 import { Switch } from '@/components/ui/Switch';
 import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/hooks/useToast';
-import { ArrowLeft, Save, Plus, Check, X } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Check, X, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabase/client';
 import { Modal } from '@/components/ui/Modal';
 
@@ -30,7 +30,20 @@ export function VariantFormV2() {
   const [selectedPowertrainId, setSelectedPowertrainId] = useState<string | null>(null);
   const [selectedFeatures, setSelectedFeatures] = useState<Record<string, 'standard' | 'optional' | 'none'>>({});
   const [isFeatureModalOpen, setIsFeatureModalOpen] = useState(false);
+  const [isColorModalOpen, setIsColorModalOpen] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [pendingSaveStatus, setPendingSaveStatus] = useState<string | null>(null);
   const [newFeature, setNewFeature] = useState({ name: '', category: 'comfort' });
+  const [newColor, setNewColor] = useState({ hex: '#FFFFFF', name: '' });
+
+  const DEFAULT_COLORS = [
+    { hex: '#FFFFFF', name: 'White' },
+    { hex: '#000000', name: 'Black' },
+    { hex: '#FF0000', name: 'Red' },
+    { hex: '#FFFF00', name: 'Yellow' },
+    { hex: '#0000FF', name: 'Blue' },
+    { hex: '#808080', name: 'Grey' },
+  ];
 
   const { data: variantInit, isLoading: variantLoading } = useQuery({
     queryKey: ['variant', variantId, tenantId],
@@ -67,11 +80,12 @@ export function VariantFormV2() {
   });
   
   const categorySlug = currentModel?.category?.slug || '';
+  const subcategorySlug = currentModel?.subcategory || null;
 
   // Get field definitions
   const specFields = useMemo(() => 
-    selectedPowertrain ? getSpecFields(categorySlug, selectedPowertrain.slug) : [],
-    [categorySlug, selectedPowertrain]
+    selectedPowertrain ? getSpecFields(categorySlug, subcategorySlug, selectedPowertrain.slug) : [],
+    [categorySlug, subcategorySlug, selectedPowertrain]
   );
 
   // Form setup
@@ -109,8 +123,12 @@ export function VariantFormV2() {
           featureMap[f.id] = f.is_standard ? 'standard' : 'optional';
       });
       setSelectedFeatures(featureMap);
+    } else if (currentModel) {
+      // Pre-fill manufacturer and year for new variants
+      if (currentModel.manufacturer) setValue('specs.manufacturer', currentModel.manufacturer);
+      if (currentModel.year_from) setValue('specs.model_year', currentModel.year_from);
     }
-  }, [variantInit, setValue]);
+  }, [variantInit, currentModel, setValue]);
 
   const { data: features } = useQuery({
       queryKey: ['features', tenantId],
@@ -127,7 +145,7 @@ export function VariantFormV2() {
         const savePayload = {
             ...data,
             powertrain_type_id: selectedPowertrainId,
-            model_id: modelId || variantInit.model_id
+            model_id: modelId || variantInit?.model_id
         };
 
         return isEdit 
@@ -136,10 +154,15 @@ export function VariantFormV2() {
     },
     onSuccess: () => {
         showToast(`Variant ${isEdit ? 'updated' : 'created'} successfully`, 'success');
-        queryClient.invalidateQueries({ queryKey: ['vehicle_variants'] });
+        queryClient.invalidateQueries({ queryKey: ['all_vehicle_variants'] });
+        queryClient.invalidateQueries({ queryKey: ['vehicle_models'] });
+        setIsConfirmModalOpen(false);
         navigate('/admin/catalog');
     },
-    onError: (err: any) => showToast(err.message, 'error')
+    onError: (err: any) => {
+        showToast(err.message, 'error');
+        setIsConfirmModalOpen(false);
+    }
   });
 
   const onSave = (statusOverride?: string) => {
@@ -150,6 +173,21 @@ export function VariantFormV2() {
           }
           if (statusOverride) {
               data.status = statusOverride;
+          }
+          
+          if (isEdit) {
+              setPendingSaveStatus(statusOverride || null);
+              setIsConfirmModalOpen(true);
+          } else {
+              mutation.mutate(data);
+          }
+      })();
+  };
+
+  const confirmSave = () => {
+      handleSubmit(data => {
+          if (pendingSaveStatus) {
+              data.status = pendingSaveStatus;
           }
           mutation.mutate(data);
       })();
@@ -195,6 +233,10 @@ export function VariantFormV2() {
       });
   };
 
+  const specHeadingPrefix = currentModel?.subcategory ? 
+      (currentModel.category?.subcategories?.find((s: any) => s.slug === currentModel.subcategory)?.label || currentModel.category?.name)
+      : currentModel?.category?.name;
+
   return (
     <PageWrapper 
       title={isEdit ? "Edit Variant" : "Add Variant"}
@@ -204,10 +246,22 @@ export function VariantFormV2() {
         </Button>
       }
     >
-      <div className="max-w-4xl space-y-8 pb-32">
-        {/* Section A: Identity */}
+      <div className="space-y-8 pb-32">
         <Card className="p-6">
-          <h2 className="text-lg font-semibold mb-4 text-slate-900 border-b pb-2">Variant Identity</h2>
+          <div className="flex justify-between items-start mb-6 border-b pb-4">
+            <div>
+                <label className="block text-sm font-medium text-slate-500 mb-1 leading-none uppercase tracking-wider text-[10px]">Model & Manufacturer</label>
+                <div className="flex items-baseline gap-2">
+                    <span className="text-xl font-bold text-slate-900">{currentModel?.manufacturer || '...'}</span>
+                    <span className="text-xl font-medium text-slate-500">{currentModel?.name || '...'}</span>
+                </div>
+            </div>
+            <div className="text-right">
+                <h2 className="text-lg font-semibold text-slate-900 leading-tight">Variant Identity</h2>
+                <p className="text-xs text-slate-500">Global identity and launch status</p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Input 
               label="Variant Name *"
@@ -236,7 +290,7 @@ export function VariantFormV2() {
             <div className="space-y-1">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Launch Date</label>
                 <input 
-                    type="month"
+                    type="date"
                     className="w-full h-10 px-3 bg-white border border-slate-200 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                     {...register('launched_at')}
                 />
@@ -267,13 +321,55 @@ export function VariantFormV2() {
         {selectedPowertrainId && (
           <div className="space-y-8">
             <Card className="p-6">
-                <h2 className="text-lg font-semibold text-slate-900 mb-6 border-b pb-2">Specifications: {selectedPowertrain?.display_label}</h2>
+                <h2 className="text-lg font-semibold text-slate-900 mb-6 border-b pb-2">
+                    {specHeadingPrefix ? `${specHeadingPrefix} specifications` : `Specifications: ${selectedPowertrain?.display_label}`}
+                </h2>
                 <div className="space-y-8">
                     {Object.entries(groupedFields).map(([group, fields]) => (
                         <div key={group}>
                             <h3 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-4">{group}</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                {fields.map(field => (
+                                {fields.map(field => {
+                                    if (field.key === 'colour_options') {
+                                        return (
+                                            <div key={field.key} className="md:col-span-2 lg:col-span-2 space-y-3">
+                                                <label className="block text-sm font-medium text-slate-700">Colour Options</label>
+                                                <div className="flex flex-wrap gap-4 items-center">
+                                                    {(watch('specs.colour_options') || []).map((color: any, idx: number) => (
+                                                        <div key={idx} className="group relative" title={color.name}>
+                                                            <div 
+                                                                className="w-10 h-10 rounded-full border-2 border-white shadow-[0_0_0_1px_rgba(0,0,0,0.1)] cursor-pointer transition-transform hover:scale-110 active:scale-95"
+                                                                style={{ backgroundColor: color.hex }}
+                                                            />
+                                                            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 text-white text-[10px] px-2 py-0.5 rounded pointer-events-none z-10">
+                                                                {color.name}
+                                                            </div>
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    const current = watch('specs.colour_options') || [];
+                                                                    setValue('specs.colour_options', current.filter((_: any, i: number) => i !== idx));
+                                                                }}
+                                                                className="absolute -top-1 -right-1 bg-white rounded-full shadow-md p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50"
+                                                            >
+                                                                <X className="w-3 h-3 text-red-500" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => setIsColorModalOpen(true)}
+                                                        className="w-10 h-10 rounded-full border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 hover:border-indigo-300 hover:text-indigo-500 hover:bg-indigo-50 transition-all bg-slate-50/50"
+                                                        title="Add color option"
+                                                    >
+                                                        <Plus className="w-5 h-5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
                                     <div key={field.key} className={field.key === 'description' ? 'md:col-span-2 lg:col-span-4' : ''}>
                                         <label className="block text-sm font-medium text-slate-700 mb-1">
                                             {field.label} {field.required && '*'}
@@ -314,7 +410,8 @@ export function VariantFormV2() {
                                             </select>
                                         )}
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     ))}
@@ -531,9 +628,71 @@ export function VariantFormV2() {
             </div>
         </Modal>
 
+        {/* Color Palette Modal */}
+        <Modal
+            isOpen={isColorModalOpen}
+            onClose={() => setIsColorModalOpen(false)}
+            title="Add Color Option"
+        >
+            <div className="space-y-6 pt-4">
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-3">Select a base shade</label>
+                    <div className="grid grid-cols-6 gap-3">
+                        {DEFAULT_COLORS.map((c) => (
+                            <button
+                                key={c.hex}
+                                type="button"
+                                onClick={() => setNewColor({ hex: c.hex, name: c.name })}
+                                className={`w-full aspect-square rounded-lg border-2 transition-all ${newColor.hex === c.hex ? 'border-indigo-600 ring-2 ring-indigo-100 scale-110' : 'border-slate-100 hover:border-slate-200'}`}
+                                style={{ backgroundColor: c.hex }}
+                                title={c.name}
+                            />
+                        ))}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                        <label className="block text-xs font-bold text-slate-400 uppercase">Hex Code</label>
+                        <div className="flex gap-2">
+                            <div 
+                                className="w-10 h-10 rounded border border-slate-200 flex-shrink-0"
+                                style={{ backgroundColor: newColor.hex }}
+                            />
+                            <Input 
+                                value={newColor.hex}
+                                onChange={e => setNewColor(prev => ({ ...prev, hex: e.target.value }))}
+                                placeholder="#000000"
+                                className="h-10"
+                            />
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="block text-xs font-bold text-slate-400 uppercase">Custom Name</label>
+                        <Input 
+                            value={newColor.name}
+                            onChange={e => setNewColor(prev => ({ ...prev, name: e.target.value }))}
+                            placeholder="e.g. Glossy White"
+                            className="h-10"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-slate-100">
+                    <Button variant="secondary" onClick={() => setIsColorModalOpen(false)}>Cancel</Button>
+                    <Button onClick={() => {
+                        const current = watch('specs.colour_options') || [];
+                        setValue('specs.colour_options', [...current, newColor]);
+                        setIsColorModalOpen(false);
+                        setNewColor({ hex: '#FFFFFF', name: '' });
+                    }}>Add to Variant</Button>
+                </div>
+            </div>
+        </Modal>
+
         {/* Sticky Bottom Bar */}
-        <div className="fixed bottom-0 left-0 right-0 lg:left-64 bg-white/80 backdrop-blur-md border-t border-slate-200 p-4 z-50">
-            <div className="max-w-4xl mx-auto flex justify-between items-center px-4">
+        <div className="fixed bottom-0 left-0 right-0 lg:left-64 bg-white/80 backdrop-blur-md border-t border-slate-200 py-4 px-6 lg:px-8 z-50">
+            <div className="max-w-7xl mx-auto flex justify-between items-center w-full">
                 <Button variant="secondary" onClick={() => navigate('/admin/catalog')}>Discard Changes</Button>
                 <div className="flex gap-3">
                     <Button variant="secondary" disabled={mutation.isPending} onClick={() => onSave('draft')}>
@@ -546,6 +705,27 @@ export function VariantFormV2() {
                 </div>
             </div>
         </div>
+
+        {/* Save Confirmation Modal */}
+        <Modal
+            isOpen={isConfirmModalOpen}
+            onClose={() => setIsConfirmModalOpen(false)}
+            title="Confirm Changes"
+        >
+            <div className="py-4">
+                <div className="flex items-center gap-3 p-3 bg-indigo-50 text-indigo-800 rounded-lg border border-indigo-200 mb-6 text-sm">
+                    <AlertTriangle className="w-5 h-5 flex-shrink-0 text-indigo-500" />
+                    <p>Are you sure you want to update this variant? Double check the specifications to ensure accuracy before saving.</p>
+                </div>
+                
+                <div className="flex justify-end gap-3 pt-6 border-t">
+                    <Button variant="secondary" onClick={() => setIsConfirmModalOpen(false)}>Review Changes</Button>
+                    <Button disabled={mutation.isPending} onClick={confirmSave}>
+                        {mutation.isPending ? 'Saving...' : 'Confirm and Save'}
+                    </Button>
+                </div>
+            </div>
+        </Modal>
       </div>
     </PageWrapper>
   );

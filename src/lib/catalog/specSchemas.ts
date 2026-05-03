@@ -223,37 +223,176 @@ const POWERTRAIN_FIELDS: Record<string, SpecField[]> = {
   ],
 };
 
+const SUBCATEGORY_FIELDS: Record<string, SpecField[]> = {
+  'motorcycle': [
+    { key: 'engine_type', label: 'Engine Type', type: 'select', options: [{value:'single',label:'Single'},{value:'parallel-twin',label:'Parallel Twin'},{value:'v-twin',label:'V-Twin'},{value:'inline-four',label:'Inline Four'}], required: false, group: 'Performance' },
+    { key: 'top_speed_kmph', label: 'Top Speed', type: 'number', unit: 'km/h', required: false, group: 'Performance' },
+  ],
+  'scooter': [
+    { key: 'underseat_storage_litres', label: 'Underseat Storage', type: 'number', unit: 'litres', required: false, group: 'Storage' },
+    { key: 'boot_space_litres', label: 'Boot Space', type: 'number', unit: 'litres', required: false, group: 'Storage' },
+  ],
+  'moped': [
+    { key: 'underseat_storage_litres', label: 'Underseat Storage', type: 'number', unit: 'litres', required: false, group: 'Storage' },
+    { key: 'boot_space_litres', label: 'Boot Space', type: 'number', unit: 'litres', required: false, group: 'Storage' },
+  ],
+  'electric-bicycle': [
+    { key: 'motor_wattage_w', label: 'Motor wattage', type: 'number', unit: 'W', required: false, group: 'Motor' },
+    { key: 'pedal_assist_levels', label: 'Pedal Assist Levels', type: 'number', required: false, group: 'Motor' },
+    { key: 'max_speed_kmph', label: 'Max speed (legal limit)', type: 'number', unit: 'km/h', required: false, group: 'Motor' },
+  ],
+  'passenger-autorickshaw': [
+    { key: 'passenger_capacity', label: 'Passenger Capacity', type: 'number', required: false, group: 'Capacity' },
+    { key: 'fare_meter_compatible', label: 'Fare meter compatible', type: 'boolean', required: false, group: 'Capacity' },
+  ],
+  'cargo-three-wheeler': [
+    { key: 'payload_kg', label: 'Payload', type: 'number', unit: 'kg', required: false, group: 'Cargo' },
+    { key: 'cargo_bed_length_mm', label: 'Cargo Bed Length', type: 'number', unit: 'mm', required: false, group: 'Cargo' },
+  ],
+  'hatchback': [
+    { key: 'boot_space_litres', label: 'Boot Space', type: 'number', unit: 'litres', required: false, group: 'Comfort' },
+    { key: 'airbag_count', label: 'Airbag Count', type: 'number', required: false, group: 'Comfort' },
+    { key: 'ncap_rating', label: 'NCAP Rating', type: 'number', required: false, group: 'Comfort' },
+  ],
+  'sedan': [
+    { key: 'boot_space_litres', label: 'Boot Space', type: 'number', unit: 'litres', required: false, group: 'Comfort' },
+    { key: 'airbag_count', label: 'Airbag Count', type: 'number', required: false, group: 'Comfort' },
+    { key: 'ncap_rating', label: 'NCAP Rating', type: 'number', required: false, group: 'Comfort' },
+  ],
+  'crossover': [
+    { key: 'boot_space_litres', label: 'Boot Space', type: 'number', unit: 'litres', required: false, group: 'Comfort' },
+    { key: 'airbag_count', label: 'Airbag Count', type: 'number', required: false, group: 'Comfort' },
+    { key: 'ncap_rating', label: 'NCAP Rating', type: 'number', required: false, group: 'Comfort' },
+  ],
+  'convertible': [
+    { key: 'boot_space_litres', label: 'Boot Space', type: 'number', unit: 'litres', required: false, group: 'Comfort' },
+    { key: 'airbag_count', label: 'Airbag Count', type: 'number', required: false, group: 'Comfort' },
+    { key: 'ncap_rating', label: 'NCAP Rating', type: 'number', required: false, group: 'Comfort' },
+  ],
+  'suv': [
+    { key: 'boot_space_litres', label: 'Boot Space', type: 'number', unit: 'litres', required: false, group: 'Comfort' },
+    { key: 'ground_clearance_mm', label: 'Ground Clearance', type: 'number', unit: 'mm', required: false, group: 'Comfort' },
+    { key: 'airbag_count', label: 'Airbag Count', type: 'number', required: false, group: 'Comfort' },
+    { key: 'ncap_rating', label: 'NCAP Rating', type: 'number', required: false, group: 'Comfort' },
+    { key: 'third_row_seating', label: 'Third row seating', type: 'boolean', required: false, group: 'Comfort' },
+    { key: 'four_wheel_drive', label: '4WD / AWD available', type: 'boolean', required: false, group: 'Comfort' },
+  ],
+  'muv-mpv': [
+    { key: 'boot_space_litres', label: 'Boot Space', type: 'number', unit: 'litres', required: false, group: 'Comfort' },
+    { key: 'ground_clearance_mm', label: 'Ground Clearance', type: 'number', unit: 'mm', required: false, group: 'Comfort' },
+    { key: 'airbag_count', label: 'Airbag Count', type: 'number', required: false, group: 'Comfort' },
+    { key: 'ncap_rating', label: 'NCAP Rating', type: 'number', required: false, group: 'Comfort' },
+    { key: 'third_row_seating', label: 'Third row seating', type: 'boolean', required: false, group: 'Comfort' },
+    { key: 'four_wheel_drive', label: '4WD / AWD available', type: 'boolean', required: false, group: 'Comfort' },
+  ],
+  'minivan': [
+    { key: 'passenger_seating', label: 'Passenger Seating', type: 'number', required: false, group: 'Passenger' },
+    { key: 'sliding_door', label: 'Sliding door', type: 'boolean', required: false, group: 'Passenger' },
+    { key: 'ac_type', label: 'AC Type', type: 'select', options: [{value:'none',label:'None'},{value:'manual',label:'Manual'},{value:'automatic',label:'Automatic'}], required: false, group: 'Passenger' },
+  ],
+  'mini-truck': [
+    { key: 'payload_kg', label: 'Payload', type: 'number', unit: 'kg', required: false, group: 'Cargo' },
+    { key: 'cargo_bed_length_mm', label: 'Cargo Bed Length', type: 'number', unit: 'mm', required: false, group: 'Cargo' },
+    { key: 'cargo_bed_width_mm', label: 'Cargo Bed Width', type: 'number', unit: 'mm', required: false, group: 'Cargo' },
+    { key: 'cargo_bed_height_mm', label: 'Cargo Bed Height', type: 'number', unit: 'mm', required: false, group: 'Cargo' },
+    { key: 'cabin_type', label: 'Cabin Type', type: 'select', options: [{value:'single',label:'Single'},{value:'double',label:'Double'}], required: false, group: 'Cargo' },
+  ],
+  'pickup-truck': [
+    { key: 'payload_kg', label: 'Payload', type: 'number', unit: 'kg', required: false, group: 'Cargo' },
+    { key: 'cargo_bed_length_mm', label: 'Cargo Bed Length', type: 'number', unit: 'mm', required: false, group: 'Cargo' },
+    { key: 'cargo_bed_width_mm', label: 'Cargo Bed Width', type: 'number', unit: 'mm', required: false, group: 'Cargo' },
+    { key: 'towing_capacity_kg', label: 'Towing Capacity', type: 'number', unit: 'kg', required: false, group: 'Cargo' },
+    { key: 'cabin_type', label: 'Cabin Type', type: 'select', options: [{value:'single',label:'Single'},{value:'double',label:'Double'},{value:'crew',label:'Crew'}], required: false, group: 'Cargo' },
+  ],
+  'cargo-van': [
+    { key: 'cargo_volume_m3', label: 'Cargo volume', type: 'number', unit: 'm³', required: false, group: 'Cargo' },
+    { key: 'load_floor_length_mm', label: 'Load Floor Length', type: 'number', unit: 'mm', required: false, group: 'Cargo' },
+    { key: 'roof_height', label: 'Roof Height', type: 'select', options: [{value:'standard',label:'Standard'},{value:'high-roof',label:'High Roof'}], required: false, group: 'Cargo' },
+    { key: 'payload_kg', label: 'Payload', type: 'number', unit: 'kg', required: false, group: 'Cargo' },
+  ],
+  'small-container-truck': [
+    { key: 'gvw_kg', label: 'GVW', type: 'number', unit: 'kg', required: false, group: 'Cargo' },
+    { key: 'payload_kg', label: 'Payload', type: 'number', unit: 'kg', required: false, group: 'Cargo' },
+    { key: 'container_length_ft', label: 'Max container length', type: 'select', options: [{value:'10',label:'10'},{value:'14',label:'14'},{value:'17',label:'17'},{value:'20',label:'20'}], required: false, group: 'Cargo' },
+    { key: 'number_of_axles', label: 'Number of Axles', type: 'number', required: false, group: 'Cargo' },
+  ],
+  'school-van': [
+    { key: 'passenger_seating', label: 'Student seating capacity', type: 'number', required: false, group: 'Passenger' },
+    { key: 'gps_tracking', label: 'GPS tracking standard', type: 'boolean', required: false, group: 'Passenger' },
+    { key: 'first_aid_kit', label: 'First aid kit standard', type: 'boolean', required: false, group: 'Passenger' },
+  ],
+  'ambulance-special': [
+    { key: 'stretcher_capacity', label: 'Stretcher Capacity', type: 'number', required: false, group: 'Special' },
+    { key: 'special_purpose_description', label: 'Special purpose description', type: 'text', required: false, group: 'Special' },
+  ],
+  'city-bus': [
+    { key: 'passenger_seating', label: 'Passenger Seating', type: 'number', required: false, group: 'Passenger' },
+    { key: 'standing_capacity', label: 'Standing Capacity', type: 'number', required: false, group: 'Passenger' },
+    { key: 'door_count', label: 'Door Count', type: 'number', required: false, group: 'Passenger' },
+    { key: 'low_floor', label: 'Low floor', type: 'boolean', required: false, group: 'Passenger' },
+    { key: 'ac_type', label: 'AC Type', type: 'select', options: [{value:'none',label:'None'},{value:'manual',label:'Manual'},{value:'automatic',label:'Automatic'}], required: false, group: 'Passenger' },
+    { key: 'wheelchair_accessible', label: 'Wheelchair Accessible', type: 'boolean', required: false, group: 'Passenger' },
+  ],
+  'intercity-bus': [
+    { key: 'passenger_seating', label: 'Passenger Seating', type: 'number', required: false, group: 'Passenger' },
+    { key: 'ac_type', label: 'AC Type', type: 'select', options: [{value:'none',label:'None'},{value:'manual',label:'Manual'},{value:'automatic',label:'Automatic'}], required: false, group: 'Passenger' },
+    { key: 'luggage_compartment', label: 'Underfloor luggage compartment', type: 'boolean', required: false, group: 'Passenger' },
+    { key: 'reclining_seats', label: 'Reclining Seats', type: 'boolean', required: false, group: 'Passenger' },
+  ],
+  'school-bus': [
+    { key: 'passenger_seating', label: 'Student seating capacity', type: 'number', required: false, group: 'Passenger' },
+    { key: 'emergency_exits', label: 'Emergency Exits', type: 'number', required: false, group: 'Passenger' },
+    { key: 'gps_tracking', label: 'GPS tracking standard', type: 'boolean', required: false, group: 'Passenger' },
+    { key: 'speed_limiter', label: 'Speed limiter fitted', type: 'boolean', required: false, group: 'Passenger' },
+  ],
+  'rigid-truck': [
+    { key: 'gvw_kg', label: 'GVW', type: 'number', unit: 'kg', required: false, group: 'Load' },
+    { key: 'payload_kg', label: 'Payload', type: 'number', unit: 'kg', required: false, group: 'Load' },
+    { key: 'number_of_axles', label: 'Number of Axles', type: 'number', required: false, group: 'Load' },
+    { key: 'body_type', label: 'Body Type', type: 'select', options: [{value:'flatbed',label:'Flatbed'},{value:'box',label:'Box'},{value:'curtainsider',label:'Curtainsider'},{value:'refrigerated',label:'Refrigerated'},{value:'tanker',label:'Tanker'},{value:'other',label:'Other'}], required: false, group: 'Load' },
+  ],
+  'tipper': [
+    { key: 'gvw_kg', label: 'GVW', type: 'number', unit: 'kg', required: false, group: 'Load' },
+    { key: 'payload_kg', label: 'Payload', type: 'number', unit: 'kg', required: false, group: 'Load' },
+    { key: 'body_volume_m3', label: 'Body volume', type: 'number', unit: 'm³', required: false, group: 'Load' },
+    { key: 'tipping_mechanism', label: 'Tipping Mechanism', type: 'select', options: [{value:'rear',label:'Rear'},{value:'side',label:'Side'},{value:'three-way',label:'Three-way'}], required: false, group: 'Load' },
+    { key: 'number_of_axles', label: 'Number of Axles', type: 'number', required: false, group: 'Load' },
+  ],
+};
+
 // Helper: duplicates a common field but mark it optional/required for specific cases if needed
 // Actually, I'll just use them as they are defined.
 
-export function getSpecFields(categorySlug: string, powertrainSlug: string): SpecField[] {
+export function getSpecFields(categorySlug: string, subcategorySlug: string | null, powertrainSlug: string): SpecField[] {
   const common = [...COMMON_FIELDS];
   const categoryFields = CATEGORY_FIELDS[categorySlug] || [];
+  const subcategoryFields = subcategorySlug ? (SUBCATEGORY_FIELDS[subcategorySlug] || []) : [];
   const powertrainFields = POWERTRAIN_FIELDS[powertrainSlug] || [];
 
-  // Merge them, avoiding duplicate keys (some might overlap, e.g. displacement)
-  const allFields = [...common, ...categoryFields, ...powertrainFields];
-  const uniqueFields: SpecField[] = [];
-  const keys = new Set<string>();
-
-  for (const field of allFields) {
-    if (!keys.has(field.key)) {
-      uniqueFields.push(field);
-      keys.add(field.key);
-    }
+  // Merge them, giving precedence to subcategoryFields over categoryFields, etc.
+  // We'll process in order: common -> powertrain -> category -> subcategory
+  // and overwrite if key exists (since we iterate backwards when checking keys).
+  // Actually, easiest is mapping them.
+  const fieldsMap = new Map<string, SpecField>();
+  
+  [...common, ...powertrainFields, ...categoryFields, ...subcategoryFields].forEach(field => {
+    fieldsMap.set(field.key, field);
+  });
+  
+  // Electric bicycle special case
+  if (subcategorySlug === 'electric-bicycle') {
+    fieldsMap.delete('engine_displacement_cc');
   }
 
-  // Adjust for bus variants in HCV
-  if (categorySlug === 'hcv') {
-      // If we had the data here, we'd filter floor_type/standing_capacity.
-      // But we'll handle that filtering in the UI layer based on the watched body_type value.
-  }
-
-  return uniqueFields;
+  // To preserve group ordering mostly as before, we could just return Array.from(fieldsMap.values())
+  // But wait, the original logic kept the first occurrence when traversing [common, category, powertrain].
+  // Since subcategory overrides category, let's just use Map and keep the last added overlay for a key.
+  
+  return Array.from(fieldsMap.values());
 }
 
-export function getSpecSchema(categorySlug: string, powertrainSlug: string) {
-  const fields = getSpecFields(categorySlug, powertrainSlug);
+export function getSpecSchema(categorySlug: string, subcategorySlug: string | null, powertrainSlug: string) {
+  const fields = getSpecFields(categorySlug, subcategorySlug, powertrainSlug);
   const shape: Record<string, any> = {};
 
   for (const field of fields) {
