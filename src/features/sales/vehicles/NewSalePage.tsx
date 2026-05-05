@@ -9,8 +9,7 @@ import {
   ChevronRight, 
   CheckCircle2,
   Layers,
-  Settings2,
-  PartyPopper
+  Settings2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 

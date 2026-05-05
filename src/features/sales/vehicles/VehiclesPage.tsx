@@ -33,7 +33,7 @@ export function VehiclesPage() {
     enabled: !!tenantId,
   });
 
-  const { data, error, isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['vehicles', tenantId, debouncedSearch, page],
     queryFn: async () => {
       try {
@@ -152,10 +152,6 @@ export function VehiclesPage() {
                 </tr>
               ) : (
                 filteredRows.map((v: any) => {
-                  const isOverdue = v.next_service_date && new Date(v.next_service_date) < new Date();
-                  const isWithin30 = !isOverdue && v.next_service_date && new Date(v.next_service_date) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-                  const dueClass = isOverdue ? 'text-red-600 font-medium' : isWithin30 ? 'text-amber-600' : 'text-slate-500';
-
                   return (
                     <tr key={v.id} className="hover:bg-slate-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-mono font-medium text-slate-900">{v.vehicle_number}</td>
@@ -171,8 +167,8 @@ export function VehiclesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">{v.customer_name}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{new Date(v.sale_date).toLocaleDateString()}</td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${dueClass}`}>
-                        {v.next_service_date ? new Date(v.next_service_date).toLocaleDateString() : '-'}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                        -
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {v.is_archived ? <Badge variant="warning">Archived</Badge> : (

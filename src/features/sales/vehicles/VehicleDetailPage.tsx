@@ -237,30 +237,11 @@ export function VehicleDetailPage() {
             <h2 className="text-base font-semibold text-slate-900 mb-4 pb-2 border-b border-slate-100">
               Service Summary
             </h2>
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div>
-                <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Total Services</label>
-                <div className="mt-1 text-lg font-semibold text-slate-900">{vehicle.total_service_count || 0}</div>
-              </div>
+            <div className="grid grid-cols-1 gap-4 mb-6">
               <div>
                 <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Last Service</label>
                 <div className="mt-1 text-sm font-medium text-slate-900">
                   {vehicle.last_service_date ? new Date(vehicle.last_service_date).toLocaleDateString() : 'Never serviced'}
-                </div>
-              </div>
-              <div className="col-span-2 mt-2">
-                <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Next Service Due</label>
-                <div className="mt-1 flex items-center gap-2">
-                  {vehicle.next_service_date ? (
-                    <>
-                      <span className={`text-sm font-medium ${new Date(vehicle.next_service_date) < new Date() ? 'text-red-600' : 'text-slate-900'}`}>
-                        {new Date(vehicle.next_service_date).toLocaleDateString()}
-                      </span>
-                      {vehicle.next_service_km && <span className="text-slate-500 text-sm">or at {vehicle.next_service_km.toLocaleString()} km</span>}
-                    </>
-                  ) : (
-                    <span className="text-sm text-slate-500">Not scheduled</span>
-                  )}
                 </div>
               </div>
             </div>

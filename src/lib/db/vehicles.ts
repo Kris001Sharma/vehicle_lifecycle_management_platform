@@ -189,7 +189,8 @@ export async function getVehicleWithFullDetails(vehicleId: string, tenantId: str
   const { data, error } = await supabase
     .from('vehicles')
     .select(`
-      *,
+      id, vehicle_number, chassis_number, registration_plate, sale_date, 
+      last_service_date, status, is_archived, sale_notes, total_service_count,
       variant:vehicle_variants (
         id, name, specs, status, powertrain_type_id,
         powertrain:powertrain_types(display_label, slug),
@@ -340,11 +341,7 @@ export async function transferVehicleOwnership(
   return updated;
 }
 
-export async function getVehiclesDueForService(tenantId: string, withinDays: number) {
-  const futureDate = new Date();
-  futureDate.setDate(futureDate.getDate() + withinDays);
-  const dateStr = futureDate.toISOString().split('T')[0];
-
+export async function getVehiclesDueForService(tenantId: string, _withinDays: number) {
   const { data, error } = await supabase
     .from('vehicles')
     .select(`
