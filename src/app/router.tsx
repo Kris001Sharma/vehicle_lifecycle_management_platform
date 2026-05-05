@@ -38,7 +38,7 @@ export const router = createBrowserRouter([
         path: '/sales/*',
         element: (
           <RouteErrorBoundary portalName="Sales Portal">
-            <AuthGuard allowedRoles={['sales']}>
+            <AuthGuard allowedRoles={['sales', 'admin']}>
               <SalesDashboard />
             </AuthGuard>
           </RouteErrorBoundary>

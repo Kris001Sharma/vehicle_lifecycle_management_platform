@@ -11,7 +11,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useToast } from '@/hooks/useToast';
 import { useFormDirtyBlocker } from '@/hooks/useFormDirtyBlocker';
 import { supabase } from '@/lib/supabase/client';
-import { ArrowLeft, Save, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Badge } from '@/components/ui/Badge';
+import { ArrowLeft, Save, CheckCircle, AlertTriangle, ExternalLink, Plus } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 
 export function ModelFormPage() {
@@ -65,6 +66,17 @@ export function ModelFormPage() {
     queryKey: ['tenant_catalog_config', tenantId],
     queryFn: () => getTenantCatalogConfig(tenantId!),
     enabled: !!tenantId
+  });
+
+  const { data: variants } = useQuery({
+      queryKey: ['model_variants', modelId],
+      queryFn: async () => {
+          if (!modelId || !tenantId) return [];
+          const { data, error } = await (supabase as any).from('vehicle_variants').select('*, powertrain:powertrain_types(*)').eq('model_id', modelId).eq('tenant_id', tenantId);
+          if (error) throw error;
+          return data;
+      },
+      enabled: !!modelId && !!tenantId
   });
 
   const manufacturers = useMemo(() => {
@@ -303,6 +315,43 @@ export function ModelFormPage() {
               </div>
             </div>
           </Card>
+
+          {isEdit && (
+            <Card className="p-6">
+              <div className="flex justify-between items-center border-b pb-2 mb-6">
+                  <h2 className="text-lg font-semibold text-slate-900">Variants Dashboard</h2>
+                  <Button size="sm" type="button" onClick={() => navigate(`/admin/catalog/variants/new?model_id=${modelId}`)}>
+                      <Plus className="w-3.5 h-3.5 mr-1" /> Add Variant
+                  </Button>
+              </div>
+              <div className="space-y-2">
+                  {!variants || variants.length === 0 ? (
+                      <div className="text-sm text-slate-500 py-4 text-center border rounded-md border-dashed border-slate-200">
+                          No variants defined for this model yet.
+                      </div>
+                  ) : (
+                      variants.map((v: any) => (
+                          <div 
+                              key={v.id} 
+                              onClick={() => navigate(`/admin/catalog/variants/${v.id}/edit`)}
+                              className="flex items-center justify-between p-3 rounded-md bg-white border border-slate-200 hover:border-indigo-300 hover:shadow-sm cursor-pointer transition-all group"
+                          >
+                              <div className="flex flex-col">
+                                  <span className="text-sm font-medium text-slate-900">{v.name}</span>
+                                  <span className="text-xs text-slate-500">{v.powertrain?.display_label}</span>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                  <Badge variant={v.status === 'active' ? 'success' : v.status === 'draft' ? 'neutral' : 'error'} className="text-[10px] px-2 py-0.5">
+                                      {v.status}
+                                  </Badge>
+                                  <ExternalLink className="w-4 h-4 text-slate-400 opacity-50 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                          </div>
+                      ))
+                  )}
+              </div>
+            </Card>
+          )}
 
           <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
             <Button type="button" variant="secondary" onClick={() => navigate('/admin/catalog')}>

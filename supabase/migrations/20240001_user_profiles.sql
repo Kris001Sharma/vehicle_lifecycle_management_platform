@@ -74,10 +74,8 @@ CREATE TRIGGER on_auth_user_sync
 -- 4. RLS FOR USER PROFILES
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "user_can_read_own_profile" ON public.user_profiles;
-CREATE POLICY "user_can_read_own_profile"
-  ON public.user_profiles FOR SELECT
-  USING (auth.uid() = id);
+-- Note: RLS policies for user_profiles are consolidated in 20240004_rls_policies.sql
+-- to use shared helper functions.
 
 -- 5. ERROR LOGS TABLE
 CREATE TABLE IF NOT EXISTS public.error_logs (

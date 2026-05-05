@@ -107,3 +107,61 @@ To add a new feature:
 
 To add a feature to a specific variant:
 Open the variant for editing and tick the feature in Section G (standard) or Section H (optional).
+
+---
+
+## Sales portal
+
+The Sales portal is for recording vehicle sales and
+managing customer records.
+
+### Adding a new customer
+1. Sidebar → Customers → "+ Add customer"
+2. Fill in the customer's full name and phone number.
+   Phone number is used to identify the customer across
+   the system — enter it carefully.
+3. If a customer with the same phone number already
+   exists, a warning will appear. You can still save
+   if this is a different person sharing a phone.
+4. Select the customer type:
+   Individual — personal buyer
+   Fleet Owner — company or operator buying multiple
+     vehicles. Enter the fleet/company name.
+   School — educational institution
+   Transporter — logistics or transport operator
+5. Save. You will be taken to the customer's profile.
+
+### Recording a new vehicle sale
+1. Sidebar → New Sale (or Vehicles → "+ New sale")
+2. Step 1 — Select variant:
+   Click the vehicle category, then select the model,
+   then click the variant card. A full specification
+   summary appears below your selection. Verify before
+   continuing.
+3. Step 2 — Vehicle details:
+   Enter the vehicle number as it appears on the
+   vehicle's number plate or chassis. This must be
+   unique — the system will warn you if it is already
+   registered. Enter the sale date (today by default).
+4. Step 3 — Customer:
+   Search for an existing customer by name or phone.
+   Click their name to select them.
+   If the customer is not in the system, click
+   "Add new customer" and fill in their details.
+5. Step 4 — Features & confirm:
+   Standard features are pre-selected and cannot be
+   removed — they come with every vehicle of this type.
+   Tick any optional add-on features the customer
+   has purchased.
+   Review the sale summary carefully, then click
+   "Record sale."
+
+### Transferring vehicle ownership
+When a vehicle is sold to a new owner:
+1. Open the vehicle record → "Transfer ownership"
+2. Search for the new owner (they must already be in
+   the system as a customer — add them first if needed)
+3. Enter the transfer date and any notes
+4. Confirm. The ownership history is permanently recorded.
+   The previous owner's name remains in the history
+   but the vehicle is now linked to the new owner.

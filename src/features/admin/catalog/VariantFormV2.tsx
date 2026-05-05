@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getEnabledPowertrainTypes, createVariant, updateVariant, getVariantWithDetails, createFeature, getFeaturesByType } from '@/lib/db/catalogV2';
+import { getEnabledPowertrainTypes, createVariant, updateVariant, getVariantWithDetails, createFeature, getFeaturesByType, getTenantCatalogConfig } from '@/lib/db/catalogV2';
 import { getSpecFields } from '@/lib/catalog/specSchemas';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { PageWrapper } from '@/components/layout/PageWrapper';
@@ -44,6 +44,12 @@ export function VariantFormV2() {
     { hex: '#0000FF', name: 'Blue' },
     { hex: '#808080', name: 'Grey' },
   ];
+
+  const { data: config } = useQuery({
+    queryKey: ['tenant_catalog_config', tenantId],
+    queryFn: () => getTenantCatalogConfig(tenantId!),
+    enabled: !!tenantId,
+  });
 
   const { data: variantInit, isLoading: variantLoading } = useQuery({
     queryKey: ['variant', variantId, tenantId],
@@ -100,6 +106,7 @@ export function VariantFormV2() {
       warranty_battery_yrs: 0,
       service_interval_km: 10000,
       service_interval_months: 6,
+      price: 0,
       specs: {} as Record<string, any>
     }
   });
@@ -115,6 +122,7 @@ export function VariantFormV2() {
       setValue('warranty_battery_yrs', variantInit.warranty_battery_yrs || 0);
       setValue('service_interval_km', variantInit.service_interval_km || 10000);
       setValue('service_interval_months', variantInit.service_interval_months || 6);
+      setValue('price', variantInit.price || 0);
       setValue('specs', variantInit.specs || {});
       setSelectedPowertrainId(variantInit.powertrain_type_id);
 
@@ -315,6 +323,30 @@ export function VariantFormV2() {
               </div>
             ))}
           </div>
+        </Card>
+
+        {/* Pricing Section */}
+        <Card className="p-6">
+            <h2 className="text-lg font-semibold text-slate-900 border-b pb-2 mb-6">Pricing</h2>
+            <div className="max-w-xs">
+                <label className="block text-sm font-medium text-slate-700 mb-1">Variant Price ({config?.currency || 'INR'}) *</label>
+                <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium">
+                        {config?.currency === 'USD' ? '$' : 
+                         config?.currency === 'EUR' ? '€' : 
+                         config?.currency === 'GBP' ? '£' : 
+                         config?.currency === 'INR' ? '₹' : 
+                         config?.currency === 'NPR' ? 'रू' : ''}
+                    </div>
+                    <input 
+                        type="number" 
+                        step="0.01"
+                        className="w-full h-10 pl-10 pr-3 bg-white border border-slate-200 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none font-medium"
+                        {...register('price', { valueAsNumber: true, required: true, min: 0 })}
+                    />
+                </div>
+                <p className="text-[10px] text-slate-500 mt-2 italic">Ex-showroom price for this variant.</p>
+            </div>
         </Card>
 
         {/* Section C & D & E: Dynamic Specs */}

@@ -1,36 +1,39 @@
-import { PageWrapper } from '@/components/layout/PageWrapper';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { Card } from '@/components/ui/Card';
-import { Skeleton } from '@/components/ui/Skeleton';
 import { LayoutDashboard, Users, Car, PlusCircle } from 'lucide-react';
+import { SalesDashboard } from './SalesDashboard';
+import { CustomersPage } from './customers/CustomersPage';
+import { CustomerDetailPage } from './customers/CustomerDetailPage';
+import { CustomerFormPage } from './customers/CustomerFormPage';
+import { VehiclesPage } from './vehicles/VehiclesPage';
+import { VehicleDetailPage } from './vehicles/VehicleDetailPage';
+import { NewSalePage } from './vehicles/NewSalePage';
 
 const SALES_NAV = [
   { label: 'Dashboard', path: '/sales', icon: LayoutDashboard },
   { label: 'Customers', path: '/sales/customers', icon: Users },
   { label: 'Vehicles', path: '/sales/vehicles', icon: Car },
-  { label: 'New Sale', path: '/sales/new-sale', icon: PlusCircle },
+  { label: 'New Sale', path: '/sales/vehicles/new', icon: PlusCircle, isPrimary: true },
 ];
 
-export default function SalesDashboard() {
+export default function SalesPortal() {
+  const location = useLocation();
+
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar role="sales" navItems={SALES_NAV} currentPath="/sales" />
-      <PageWrapper title="Sales Dashboard">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card title="Monthly Sales">
-            <Skeleton className="h-10 w-24 mb-2" />
-            <Skeleton className="h-4 w-32" />
-          </Card>
-          <Card title="Active Leads">
-            <Skeleton className="h-10 w-24 mb-2" />
-            <Skeleton className="h-4 w-32" />
-          </Card>
-          <Card title="Available Inventory">
-            <Skeleton className="h-10 w-24 mb-2" />
-            <Skeleton className="h-4 w-32" />
-          </Card>
-        </div>
-      </PageWrapper>
+      <Sidebar role="sales" navItems={SALES_NAV} currentPath={location.pathname} />
+      <div className="flex-1 w-0 overflow-y-auto bg-slate-50 relative">
+        <Routes>
+          <Route path="/" element={<SalesDashboard />} />
+          <Route path="/customers" element={<CustomersPage />} />
+          <Route path="/customers/new" element={<CustomerFormPage />} />
+          <Route path="/customers/:customerId" element={<CustomerDetailPage />} />
+          <Route path="/customers/:customerId/edit" element={<CustomerFormPage />} />
+          <Route path="/vehicles" element={<VehiclesPage />} />
+          <Route path="/vehicles/new" element={<NewSalePage />} />
+          <Route path="/vehicles/:vehicleId" element={<VehicleDetailPage />} />
+        </Routes>
+      </div>
     </div>
   );
 }
