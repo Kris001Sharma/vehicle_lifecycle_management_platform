@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS public.vehicle_variants (
   warranty_battery_yrs INT,
   warranty_motor_yrs INT,
   launched_at DATE,
+  price NUMERIC DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

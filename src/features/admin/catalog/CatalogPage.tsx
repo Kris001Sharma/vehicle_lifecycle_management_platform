@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { getModelsWithCategory } from '@/lib/db/catalogV2';
+import { getModelsWithCategory, getTenantCatalogConfig } from '@/lib/db/catalogV2';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/Button';
@@ -19,7 +19,13 @@ function CatalogContent() {
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
   // Queries
-  const { data: models = [], isLoading } = useQuery({
+  const { data: config } = useQuery({
+    queryKey: ['tenant_catalog_config', tenantId],
+    queryFn: () => getTenantCatalogConfig(tenantId!),
+    enabled: !!tenantId,
+  });
+
+  const { data: models = [], isPending, isSuccess } = useQuery({
     queryKey: ['vehicle_models', tenantId],
     queryFn: () => getModelsWithCategory(tenantId!),
     enabled: !!tenantId,
@@ -54,7 +60,18 @@ function CatalogContent() {
     setExpandedCategories(prev => ({ ...prev, [categoryName]: !prev[categoryName] }));
   };
 
-  if (isLoading) {
+  const formatPrice = (price: number) => {
+    if (!config) return price.toLocaleString();
+    const symbol = config.currency === 'USD' ? '$' : 
+                   config.currency === 'EUR' ? '€' : 
+                   config.currency === 'GBP' ? '£' : 
+                   config.currency === 'INR' ? '₹' : 
+                   config.currency === 'NPR' ? 'रू' : '';
+    
+    return `${symbol}${price.toLocaleString()}`;
+  };
+
+  if (isPending && !!tenantId) {
       return (
           <PageWrapper title="Vehicle Catalog">
               <div className="space-y-6">
@@ -66,7 +83,7 @@ function CatalogContent() {
       )
   }
 
-  const noModelsExist = models.length === 0;
+  const noModelsExist = isSuccess && models.length === 0;
   const noSearchResults = !noModelsExist && filteredModels.length === 0;
 
   return (
@@ -179,7 +196,10 @@ function CatalogContent() {
                                                         >
                                                             <div className="flex flex-col">
                                                                 <span className="text-sm font-medium text-slate-700">{v.name}</span>
-                                                                <span className="text-[10px] text-slate-400 uppercase tracking-tighter">{v.powertrain?.display_label}</span>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[10px] text-slate-400 uppercase tracking-tighter">{v.powertrain?.display_label}</span>
+                                                                    {v.price > 0 && <span className="text-[10px] font-bold text-slate-600">{formatPrice(v.price)}</span>}
+                                                                </div>
                                                             </div>
                                                             <div className="flex items-center gap-2">
                                                                 <Badge variant={v.status === 'active' ? 'success' : v.status === 'draft' ? 'neutral' : 'error'} className="text-[9px] px-1.5 py-0 leading-none">

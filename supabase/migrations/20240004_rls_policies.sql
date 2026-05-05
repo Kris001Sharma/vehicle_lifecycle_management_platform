@@ -81,8 +81,8 @@ CREATE POLICY "admin_can_select_vehicle_variants" ON public.vehicle_variants FOR
 CREATE POLICY "admin_can_insert_vehicle_variants" ON public.vehicle_variants FOR INSERT TO authenticated WITH CHECK (public.get_user_role() = 'admin' AND tenant_id = public.get_user_tenant_id());
 CREATE POLICY "admin_can_update_vehicle_variants" ON public.vehicle_variants FOR UPDATE TO authenticated USING (public.get_user_role() = 'admin' AND tenant_id = public.get_user_tenant_id());
 CREATE POLICY "admin_can_delete_vehicle_variants" ON public.vehicle_variants FOR DELETE TO authenticated USING (public.get_user_role() = 'admin' AND tenant_id = public.get_user_tenant_id());
-CREATE POLICY "sales_can_select_vehicle_variants" ON public.vehicle_variants FOR SELECT TO authenticated USING (public.get_user_role() = 'sales' AND tenant_id = public.get_user_tenant_id());
-CREATE POLICY "service_can_select_vehicle_variants" ON public.vehicle_variants FOR SELECT TO authenticated USING (public.get_user_role() = 'service' AND tenant_id = public.get_user_tenant_id());
+CREATE POLICY "sales_can_select_vehicle_variants" ON public.vehicle_variants FOR SELECT TO authenticated USING (tenant_id = public.get_user_tenant_id());
+CREATE POLICY "service_can_select_vehicle_variants" ON public.vehicle_variants FOR SELECT TO authenticated USING (tenant_id = public.get_user_tenant_id());
 
 
 -- 5. features
@@ -272,3 +272,22 @@ CREATE POLICY "service_can_delete_attachments" ON public.attachments FOR DELETE 
 -- 14. audit_logs
 DROP POLICY IF EXISTS "auth_can_insert_audit_logs" ON public.audit_logs;
 CREATE POLICY "auth_can_insert_audit_logs" ON public.audit_logs FOR INSERT TO authenticated WITH CHECK (tenant_id = public.get_user_tenant_id());
+
+
+-- 15. user_profiles
+DROP POLICY IF EXISTS "admin_can_manage_all_profiles" ON public.user_profiles;
+CREATE POLICY "admin_can_manage_all_profiles" ON public.user_profiles
+  FOR ALL TO authenticated
+  USING (
+    public.get_user_role() = 'admin' 
+    AND tenant_id = public.get_user_tenant_id()
+  )
+  WITH CHECK (
+    public.get_user_role() = 'admin' 
+    AND tenant_id = public.get_user_tenant_id()
+  );
+
+DROP POLICY IF EXISTS "users_can_read_all_in_tenant" ON public.user_profiles;
+CREATE POLICY "users_can_read_all_in_tenant" ON public.user_profiles
+  FOR SELECT TO authenticated
+  USING (tenant_id = public.get_user_tenant_id());
