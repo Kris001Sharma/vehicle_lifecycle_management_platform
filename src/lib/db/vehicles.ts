@@ -204,6 +204,11 @@ export async function getVehicleWithFullDetails(vehicleId: string, tenantId: str
       features:vehicle_features (
         is_standard,
         feature:features (id, name, category)
+      ),
+      vehicle_ownership_history (
+        *,
+        previous_customer:customers!vehicle_ownership_history_from_customer_id_fkey(name),
+        new_customer:customers!vehicle_ownership_history_to_customer_id_fkey(name)
       )
     `)
     .eq('id', vehicleId)
@@ -354,9 +359,9 @@ export async function transferVehicleOwnership(
   // 4. Insert history row
   await (supabase as any).from('vehicle_ownership_history').insert({
     vehicle_id: vehicleId,
-    previous_customer_id: (vehicle as any)?.customer_id || null,
-    new_customer_id: newCustomerId,
-    transfer_date: transferDate,
+    from_customer_id: (vehicle as any)?.customer_id || null,
+    to_customer_id: newCustomerId,
+    transferred_at: transferDate,
     notes,
     tenant_id: tenantId,
     recorded_by: userId

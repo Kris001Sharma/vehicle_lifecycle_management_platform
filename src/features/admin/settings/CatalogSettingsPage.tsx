@@ -61,7 +61,8 @@ export function CatalogSettingsPage() {
     default_service_interval_km: 10000,
     default_service_interval_months: 6,
     regulatory_market: 'IN',
-    currency: 'INR'
+    currency: 'INR',
+    finance_tracking_enabled: false
   });
 
   useEffect(() => {
@@ -73,7 +74,8 @@ export function CatalogSettingsPage() {
         default_service_interval_km: config.default_service_interval_km || 10000,
         default_service_interval_months: config.default_service_interval_months || 6,
         regulatory_market: config.regulatory_market || 'IN',
-        currency: config.currency || 'INR'
+        currency: config.currency || 'INR',
+        finance_tracking_enabled: config.finance_tracking_enabled || false
       });
     }
   }, [config]);
@@ -334,6 +336,21 @@ export function CatalogSettingsPage() {
                         <option value="Other">Other</option>
                     </select>
                 </div>
+            </div>
+        </section>
+
+        {/* Section 5: Finance & deposit tracking */}
+        <section className="bg-white p-6 rounded-lg border border-slate-200">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 mb-1">Finance & deposit tracking</h2>
+                <p className="text-sm text-slate-500">Enable this to record deposit amounts, finance types, and loan details on pre-bookings and sales. When disabled, all finance fields are hidden across the application.</p>
+              </div>
+              <Switch 
+                checked={(formState as any).finance_tracking_enabled || false}
+                onChange={() => setFormState(prev => ({ ...prev, finance_tracking_enabled: !(prev as any).finance_tracking_enabled }))}
+                className="mt-1"
+              />
             </div>
         </section>
 

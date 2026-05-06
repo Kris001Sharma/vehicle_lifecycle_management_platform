@@ -165,3 +165,60 @@ When a vehicle is sold to a new owner:
 4. Confirm. The ownership history is permanently recorded.
    The previous owner's name remains in the history
    but the vehicle is now linked to the new owner.
+
+### Managing inventory
+The inventory section tracks vehicles that are physically at your dealership before they are sold.
+
+To add a vehicle to inventory:
+1. Sidebar → Inventory → "+ Add unit"
+2. Select the variant using the category, model, and variant selectors.
+3. Enter the chassis number if available.
+4. Select the condition: New, Demo, or Refurbished.
+5. Enter the date the vehicle was received.
+6. Save. The unit appears in your inventory list.
+
+Inventory statuses:
+- In stock: available for sale or pre-booking
+- Reserved: linked to a pre-booking
+- Demo: used for demonstration purposes
+- Sold: linked to a completed sale record
+- Written off: removed from available stock
+
+### Managing pre-bookings
+A pre-booking records a customer's order for a vehicle that has not yet been delivered.
+
+To create a pre-booking:
+1. Open the customer's profile → Pre-bookings tab → "+ Create pre-booking"
+   Or: Sidebar → Pre-bookings → "+ New pre-booking"
+2. Select the variant the customer wants.
+3. Enter the booking date and expected delivery date.
+4. Optionally link a stock unit if one is reserved for this customer.
+5. If finance tracking is enabled, record deposit and finance details.
+6. Save.
+
+Updating pre-booking status:
+As the order progresses, update the status:
+Enquiry → Confirmed → Ordered → In transit → Delivered
+Click "Update status" on the booking card and select the next step.
+
+Converting to a sale:
+When the vehicle is delivered and the booking status is set to "Delivered", a "Convert to sale" button appears. This opens the sale recording form with customer and variant details pre-filled.
+
+Cancelling a pre-booking:
+Click "Cancel booking" and provide a reason.
+If a stock unit was reserved, it is automatically released back to "In stock" status.
+
+### Logging customer interactions
+Keep a record of all conversations and follow-ups with your customers.
+
+To log an interaction:
+1. Open customer profile → Communications tab
+2. Click "+ Log interaction"
+3. Select the interaction type (phone call, WhatsApp, email, site visit, etc.)
+4. Enter what was discussed in the notes field.
+5. Select the outcome of the conversation.
+6. If you need to follow up: switch to "Schedule follow-up" mode and set the follow-up date.
+7. Optionally link the interaction to a specific pre-booking if it is about a particular order.
+8. Save.
+
+Follow-ups due today appear on your sales dashboard automatically. Click "Mark done" once completed.
