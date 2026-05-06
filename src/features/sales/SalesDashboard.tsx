@@ -28,7 +28,9 @@ export function SalesDashboard() {
         .from('vehicles')
         .select(`
           id, vehicle_number, sale_date,
-          model:vehicle_models(name, manufacturer),
+          variant:vehicle_variants (
+            model:vehicle_models (name, manufacturer)
+          ),
           customer:customers(name)
         `)
         .eq('tenant_id', tenantId)
@@ -65,16 +67,22 @@ export function SalesDashboard() {
           ) : recentSales && recentSales.length > 0 ? (
             <div className="space-y-4">
               {recentSales.map((v: any) => (
-                <div key={v.id} className="flex justify-between items-center pb-4 border-b border-slate-100 last:border-0 last:pb-0">
+                <Link 
+                  key={v.id} 
+                  to={`/sales/vehicles/${v.id}`}
+                  className="flex justify-between items-center pb-4 border-b border-slate-100 last:border-0 last:pb-0 hover:bg-slate-50 transition-colors"
+                >
                   <div>
                     <div className="font-mono text-sm font-medium text-slate-900">{v.vehicle_number}</div>
-                    <div className="text-xs text-slate-500">{v.model?.manufacturer} {v.model?.name}</div>
+                    <div className="text-xs text-slate-500">
+                      {v.variant?.model?.manufacturer} {v.variant?.model?.name}
+                    </div>
                   </div>
                   <div className="text-right">
                     <div className="text-sm text-slate-900">{v.customer?.name}</div>
                     <div className="text-xs text-slate-500">{new Date(v.sale_date).toLocaleDateString()}</div>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (

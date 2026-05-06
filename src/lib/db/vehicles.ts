@@ -144,13 +144,13 @@ export async function createVehicleSale(
     // 3. Fetch variant_default_features for the variant
     const { data: features } = await (supabase as any)
       .from('variant_default_features')
-      .select('feature_id, type')
+      .select('feature_id, is_standard')
       .eq('variant_id', saleData.variant_id);
 
     if (features && features.length > 0) {
       // 4. Separate into standard and optional
       const featuresToInsert = features.filter((f: any) => 
-        f.type === 'standard' || selectedOptionalFeatureIds.includes(f.feature_id)
+        f.is_standard || selectedOptionalFeatureIds.includes(f.feature_id)
       );
 
       if (featuresToInsert.length > 0) {
@@ -158,7 +158,7 @@ export async function createVehicleSale(
         const insertData = featuresToInsert.map((f: any) => ({
           vehicle_id: vehicle.id,
           feature_id: f.feature_id,
-          type: f.type || '',
+          is_standard: f.is_standard,
           tenant_id: tenantId
         }));
 
@@ -193,6 +193,7 @@ export async function getVehicleWithFullDetails(vehicleId: string, tenantId: str
       last_service_date, status, is_archived, sale_notes, total_service_count,
       variant:vehicle_variants (
         id, name, specs, status, powertrain_type_id,
+        service_interval_km, service_interval_months,
         powertrain:powertrain_types(display_label, slug),
         model:vehicle_models (
           manufacturer, name, subcategory, use_type,
@@ -201,7 +202,7 @@ export async function getVehicleWithFullDetails(vehicleId: string, tenantId: str
       ),
       customer:customers (*),
       features:vehicle_features (
-        type,
+        is_standard,
         feature:features (id, name, category)
       )
     `)
@@ -215,13 +216,32 @@ export async function getVehicleWithFullDetails(vehicleId: string, tenantId: str
   // Fetch last 3 service records
   const { data: serviceRecords } = await supabase
     .from('service_records')
-    .select('id, record_date, service_type, odometer_reading, total_cost, status')
+    .select('id, visit_date, visit_type, mileage_at_visit, next_service_km, next_service_date, status')
     .eq('vehicle_id', vehicleId)
-    .order('record_date', { ascending: false })
+    .order('visit_date', { ascending: false })
     .limit(3);
 
+  const vehicle = data as any;
+  const latestService = (serviceRecords && serviceRecords.length > 0 ? serviceRecords[0] : null) as any;
+
+  // Holistic logic: If no service record exists, calculate the first service due based on sale_date and variant intervals
+  let next_service_date = latestService?.next_service_date;
+  let next_service_km = latestService?.next_service_km;
+
+  if (!next_service_date && vehicle.variant?.service_interval_months) {
+    const saleDate = new Date(vehicle.sale_date);
+    saleDate.setMonth(saleDate.getMonth() + vehicle.variant.service_interval_months);
+    next_service_date = saleDate.toISOString().split('T')[0];
+  }
+
+  if (!next_service_km && vehicle.variant?.service_interval_km) {
+    next_service_km = vehicle.variant.service_interval_km;
+  }
+
   return {
-    ...(data as any),
+    ...vehicle,
+    next_service_date,
+    next_service_km,
     service_records: serviceRecords || []
   };
 }
@@ -242,13 +262,15 @@ export async function searchVehicles(
       last_service_date, status, is_archived,
       variant:vehicle_variants (
         name,
+        service_interval_months,
         powertrain:powertrain_types (display_label),
         model:vehicle_models (
           name, manufacturer, subcategory,
           category:vehicle_categories (name)
         )
       ),
-      customer:customers (name, phone)
+      customer:customers (name, phone),
+      service_records (next_service_date)
     `, { count: 'exact' })
     .eq('tenant_id', tenantId);
 
@@ -271,15 +293,27 @@ export async function searchVehicles(
   console.log("Vehicles fetch result:", { count, rowCount: data?.length });
 
   return {
-    rows: data?.map((v: any) => Object.assign({}, v, {
-      model_name: v.variant?.model?.name,
-      manufacturer: v.variant?.model?.manufacturer,
-      category_name: v.variant?.model?.category?.name,
-      subcategory: v.variant?.model?.subcategory,
-      powertrain_display_label: v.variant?.powertrain?.display_label,
-      customer_name: v.customer?.name,
-      customer_phone: v.customer?.phone
-    })) || [],
+    rows: (data as any[])?.map((v: any) => {
+      // Get next_service_date from the latest service record or calculate it
+      let next_service_date = v.service_records?.[0]?.next_service_date;
+      
+      if (!next_service_date && v.variant?.service_interval_months) {
+        const saleDate = new Date(v.sale_date);
+        saleDate.setMonth(saleDate.getMonth() + v.variant.service_interval_months);
+        next_service_date = saleDate.toISOString().split('T')[0];
+      }
+
+      return Object.assign({}, v, {
+        model_name: v.variant?.model?.name,
+        manufacturer: v.variant?.model?.manufacturer,
+        category_name: v.variant?.model?.category?.name,
+        subcategory: v.variant?.model?.subcategory,
+        powertrain_display_label: v.variant?.powertrain?.display_label,
+        customer_name: v.customer?.name,
+        customer_phone: v.customer?.phone,
+        next_service_date
+      });
+    }) || [],
     totalCount: count || 0
   };
 }

@@ -60,13 +60,13 @@ export async function getCustomerById(customerId: string, tenantId: string) {
       is_archived,
       variant:vehicle_variants (
         name,
-        powertrain:powertrain_types (display_label)
-      ),
-      model:vehicle_models (
-        name,
-        manufacturer,
-        subcategory,
-        category:vehicle_categories (name)
+        powertrain:powertrain_types (display_label),
+        model:vehicle_models (
+          name,
+          manufacturer,
+          subcategory,
+          category:vehicle_categories (name)
+        )
       )
     `)
     .eq('customer_id', customerId)
@@ -77,15 +77,15 @@ export async function getCustomerById(customerId: string, tenantId: string) {
 
   return {
     ...(customer as any),
-    vehicles: vehicles?.map((v: any) => Object.assign({}, v, {
+    vehicles: vehicles?.map((v: any) => ({
+      ...v,
       variant_name: v.variant?.name,
-      model_name: v.model?.name,
-      manufacturer: v.model?.manufacturer,
-      category_name: v.model?.category?.name,
-      subcategory: v.model?.subcategory,
+      model_name: v.variant?.model?.name,
+      manufacturer: v.variant?.model?.manufacturer,
+      category_name: v.variant?.model?.category?.name,
+      subcategory: v.variant?.model?.subcategory,
       powertrain_display_label: v.variant?.powertrain?.display_label,
       variant: undefined, // Cleanup
-      model: undefined
     }))
   };
 }

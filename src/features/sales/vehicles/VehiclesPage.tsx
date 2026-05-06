@@ -168,7 +168,11 @@ export function VehiclesPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">{v.customer_name}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{new Date(v.sale_date).toLocaleDateString()}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                        -
+                        {v.next_service_date ? (
+                          <span className={new Date(v.next_service_date) < new Date() ? 'text-red-500 font-medium' : ''}>
+                            {new Date(v.next_service_date).toLocaleDateString()}
+                          </span>
+                        ) : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {v.is_archived ? <Badge variant="warning">Archived</Badge> : (

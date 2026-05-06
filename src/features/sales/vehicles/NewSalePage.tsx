@@ -32,8 +32,9 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/hooks/useToast';
-import { useFormDirtyBlocker } from '@/hooks/useFormDirtyBlocker';
+import { useFormDirtyNavigation } from '@/hooks/useFormDirtyNavigation';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { getVariantsForSale, checkVehicleNumberUnique, createVehicleSale } from '@/lib/db/vehicles';
 import { getTenantCatalogConfig } from '@/lib/db/catalogV2';
@@ -61,9 +62,7 @@ export function NewSalePage() {
 
   const [step, setStep] = useState(1);
   const [selectionStep, setSelectionStep] = useState(1); // 1: Category, 2: Manufacturer, 3: Model, 4: Variant
-  const [isDirty, setIsDirty] = useState(false);
-  const { blocker, reset: resetBlocker } = useFormDirtyBlocker(isDirty);
-
+  
   const [recordedSale, setRecordedSale] = useState<any>(null);
 
   // Selection State
@@ -96,6 +95,18 @@ export function NewSalePage() {
   const [newCustFleet, setNewCustFleet] = useState('');
   const [duplicateWarning, setDuplicateWarning] = useState<any>(null);
 
+  // Form dirty state for navigation protection
+  const isActuallyDirty = useMemo(() => {
+    if (recordedSale) return false;
+    return !!selectedCategory || !!vehicleNumber || !!selectedCustomer || !!newCustName || !!selectedModel || !!selectedVariant;
+  }, [recordedSale, selectedCategory, vehicleNumber, selectedCustomer, newCustName, selectedModel, selectedVariant]);
+
+  const { 
+    shouldShowDialog, 
+    handleConfirmNavigation, 
+    handleCancelNavigation 
+  } = useFormDirtyNavigation(isActuallyDirty);
+
   // Step 4: Features
   const [selectedOptionalFeatures, setSelectedOptionalFeatures] = useState<string[]>([]);
   
@@ -123,7 +134,7 @@ export function NewSalePage() {
     queryFn: async () => {
       const { data } = await supabase
         .from('variant_default_features')
-        .select('feature:features(id, name, category), type')
+        .select('feature:features(id, name, category), is_standard')
         .eq('variant_id', selectedVariant.id);
       return data || [];
     },
@@ -178,7 +189,6 @@ export function NewSalePage() {
   };
 
   const handleNext = () => {
-    setIsDirty(true);
     setStep(s => s + 1);
   };
 
@@ -198,8 +208,6 @@ export function NewSalePage() {
       }, selectedOptionalFeatures, tenantId, user.id);
     },
     onSuccess: (data: any) => {
-      setIsDirty(false); // Clear dirty state to prevent exit blocker
-      resetBlocker();
       queryClient.invalidateQueries({ queryKey: ['vehicles'] });
       
       const vehicle = data.vehicle || { id: data.vehicleId };
@@ -250,8 +258,8 @@ export function NewSalePage() {
     return selectedCategory.models.filter((m: any) => m.manufacturer === selectedManufacturer);
   }, [selectedCategory, selectedManufacturer]);
 
-  const standardFeaturesList = useMemo(() => variantFeatures?.filter((f: any) => f.type === 'standard') || [], [variantFeatures]);
-  const optionalFeaturesList = useMemo(() => variantFeatures?.filter((f: any) => f.type === 'optional') || [], [variantFeatures]);
+  const standardFeaturesList = useMemo(() => variantFeatures?.filter((f: any) => f.is_standard) || [], [variantFeatures]);
+  const optionalFeaturesList = useMemo(() => variantFeatures?.filter((f: any) => !f.is_standard) || [], [variantFeatures]);
 
   // Ref for auto-scrolling
   const scrollRef = (id: string) => (el: HTMLDivElement | null) => {
@@ -970,39 +978,19 @@ export function NewSalePage() {
                   </div>
                 </div>
               )}
-
-              {/* Navigation Confirmation Dialog */}
-              {blocker.state === "blocked" && !recordedSale && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-                  <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200">
-                    <h3 className="text-lg font-bold text-slate-900">Unsaved Changes</h3>
-                    <p className="text-slate-500 mt-2 text-sm">
-                      You have an ongoing sale configuration. Leaving will discard all progress. Are you sure?
-                    </p>
-                    <div className="flex gap-3 mt-8">
-                      <Button 
-                        variant="secondary" 
-                        onClick={() => blocker.reset()} 
-                        className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border-none"
-                      >
-                        Stay
-                      </Button>
-                      <Button 
-                        variant="destructive" 
-                        onClick={() => {
-                          setIsDirty(false);
-                          setTimeout(() => blocker.proceed(), 0);
-                        }} 
-                        className="flex-1"
-                      >
-                        Leave
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
         )}
+
+        {/* Global Confirmation Dialog for Navigation */}
+        <ConfirmDialog
+          isOpen={shouldShowDialog}
+          onClose={handleCancelNavigation}
+          onConfirm={handleConfirmNavigation}
+          title="Unsaved Changes"
+          message="You have an ongoing sale configuration. Leaving this page will discard all progress and entered details. Are you sure you want to cancel?"
+          confirmLabel="Discard & Leave"
+          confirmVariant="destructive"
+        />
 
       </div>
     </PageWrapper>

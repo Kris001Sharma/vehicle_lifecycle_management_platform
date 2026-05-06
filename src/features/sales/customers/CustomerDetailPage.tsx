@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -13,7 +13,7 @@ export function CustomerDetailPage() {
   const { tenantId } = useAuthStore(s => s.user!) || {};
   const navigate = useNavigate();
 
-  const { data: customer, isLoading } = useQuery({
+  const { data: customer, isLoading, error } = useQuery({
     queryKey: ['customer', customerId, tenantId],
     queryFn: () => getCustomerById(customerId!, tenantId!),
     enabled: !!tenantId && !!customerId,
@@ -29,10 +29,14 @@ export function CustomerDetailPage() {
     );
   }
 
-  if (!customer) {
+  if (error || !customer) {
+    if (error) console.error("Customer fetch error:", error);
     return (
-      <PageWrapper title="Customer not found" backLink={{ label: '← Customers', path: '/sales/customers' }}>
-        <div className="text-center py-12 text-slate-500">The requested customer could not be found.</div>
+      <PageWrapper title={error ? "Error loading customer" : "Customer not found"} backLink={{ label: '← Customers', path: '/sales/customers' }}>
+        <div className="text-center py-12">
+          <div className="text-slate-500 mb-4">{error ? (error as any).message : "The requested customer could not be found."}</div>
+          <Button onClick={() => navigate('/sales/customers')}>Back to list</Button>
+        </div>
       </PageWrapper>
     );
   }
@@ -49,15 +53,13 @@ export function CustomerDetailPage() {
     >
       <div className="space-y-6">
         <Card className="p-6">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4 border-b border-slate-100 pb-3">Customer Information</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 mb-6">
+          <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+            <h2 className="text-lg font-semibold text-slate-900">Customer Information</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-8">
             <div>
-              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Phone</label>
-              <div className="mt-1 text-sm text-slate-900">{customer.phone}</div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Email</label>
-              <div className="mt-1 text-sm text-slate-900">{customer.email || '-'}</div>
+              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Contact Person</label>
+              <div className="mt-1 text-sm font-semibold text-slate-900">{customer.name}</div>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Customer Type</label>
@@ -67,16 +69,26 @@ export function CustomerDetailPage() {
                 </Badge>
               </div>
             </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Phone</label>
+              <div className="mt-1 text-sm text-slate-900">
+                <a href={`tel:${customer.phone}`} className="hover:text-indigo-600 hover:underline">{customer.phone}</a>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Email</label>
+              <div className="mt-1 text-sm text-slate-900">{customer.email || '-'}</div>
+            </div>
             {customer.customer_type === 'fleet_owner' && (
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Fleet Name</label>
-                <div className="mt-1 text-sm font-medium text-slate-900">{customer.fleet_name}</div>
+                <div className="mt-1 text-sm font-medium text-slate-900">{customer.fleet_name || '-'}</div>
               </div>
             )}
             <div className="md:col-span-2">
-              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Address</label>
+              <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Location</label>
               <div className="mt-1 text-sm text-slate-900">
-                {customer.address ? `${customer.address}${customer.city ? `, ${customer.city}` : ''}` : (customer.city || '-')}
+                {[customer.address, customer.city].filter(Boolean).join(', ') || '-'}
               </div>
             </div>
           </div>
@@ -88,47 +100,60 @@ export function CustomerDetailPage() {
         </Card>
 
         <Card className="p-6">
-          <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+          <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-3">
             <h2 className="text-lg font-semibold text-slate-900">Vehicles ({customer.vehicles?.length || 0})</h2>
-            <Button size="sm" variant="ghost" className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50" onClick={() => navigate('/sales/vehicles/new')}>
+            <Link to="/sales/vehicles/new" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
               + Record a sale
-            </Button>
+            </Link>
           </div>
           
           {!customer.vehicles || customer.vehicles.length === 0 ? (
-            <div className="text-center py-8 text-sm text-slate-500">
-              No vehicles recorded for this customer.
+            <div className="text-center py-12">
+              <p className="text-sm text-slate-500 mb-4">No vehicles recorded for this customer.</p>
+              <Button variant="secondary" size="sm" onClick={() => navigate('/sales/vehicles/new')}>
+                + Record a sale
+              </Button>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {customer.vehicles.map((v: any) => (
                 <div 
                   key={v.id} 
                   onClick={() => navigate(`/sales/vehicles/${v.id}`)}
-                  className="block p-4 border border-slate-200 rounded-lg hover:border-indigo-300 hover:shadow-sm cursor-pointer transition-all bg-white"
+                  className="p-5 border border-slate-200 rounded-xl hover:border-indigo-400 hover:shadow-md cursor-pointer transition-all bg-white group"
                 >
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="font-mono font-semibold text-slate-900">{v.vehicle_number}</span>
-                    <div className="flex gap-2">
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="font-mono font-bold text-slate-900 text-base">{v.vehicle_number}</span>
+                    <div className="flex items-center gap-2">
                       {v.is_archived && <Badge variant="warning">Archived</Badge>}
                       <Badge 
-                        variant={v.status === 'active' ? 'success' : v.status === 'transferred' ? 'neutral' : 'error'}
+                        variant={v.status === 'active' ? 'success' : v.status === 'transferred' ? 'neutral' : v.status === 'retired' ? 'error' : 'neutral'}
+                        className="font-medium"
                       >
                         {v.status}
                       </Badge>
                     </div>
                   </div>
                   
-                  <div className="flex flex-wrap items-center gap-2 mb-3 text-sm text-slate-600">
-                    <span className="font-medium">{v.manufacturer} {v.model_name}</span>
-                    <span className="text-slate-300">•</span>
-                    <Badge variant="neutral" className="bg-slate-100 text-xs font-normal border-none">{v.subcategory || v.category_name}</Badge>
-                    <Badge variant="neutral" className="bg-slate-100 text-xs font-normal border-none">{v.powertrain_display_label}</Badge>
+                  <div className="space-y-3 mb-5">
+                    <div className="flex items-center gap-2">
+                       <span className="text-sm font-semibold text-slate-800">{v.manufacturer} {v.model_name}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold uppercase tracking-wider">{v.subcategory || 'Standard'}</span>
+                      <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold uppercase tracking-wider">{v.powertrain_display_label}</span>
+                    </div>
                   </div>
                   
-                  <div className="flex justify-between items-center text-xs text-slate-500 pt-3 border-t border-slate-100">
-                    <div>Sold: {new Date(v.sale_date).toLocaleDateString()}</div>
-                    <div>Last service: {v.last_service_date ? new Date(v.last_service_date).toLocaleDateString() : 'Never'}</div>
+                  <div className="flex justify-between items-center text-[11px] text-slate-500 pt-3 border-t border-slate-50">
+                    <div className="flex flex-col">
+                      <span className="uppercase tracking-tighter font-medium opacity-70">Sale Date</span>
+                      <span className="font-semibold text-slate-700">{new Date(v.sale_date).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex flex-col text-right">
+                      <span className="uppercase tracking-tighter font-medium opacity-70">Last Service</span>
+                      <span className="font-semibold text-slate-700">{v.last_service_date ? new Date(v.last_service_date).toLocaleDateString() : 'Never'}</span>
+                    </div>
                   </div>
                 </div>
               ))}
