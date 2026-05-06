@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { createCommunication } from '@/lib/db/communications';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { useToast } from '@/hooks/useToast';
 import { Phone, MessageSquare, Mail, Building, User, FileText } from 'lucide-react';
+import { useFormDirtyNavigation } from '@/hooks/useFormDirtyNavigation';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export function CommunicationLogModal({ isOpen, onClose, customerId, tenantId, preBookings, onSuccess }: any) {
   const { user } = useAuthStore();
@@ -18,6 +20,21 @@ export function CommunicationLogModal({ isOpen, onClose, customerId, tenantId, p
   const [linkedBookingId, setLinkedBookingId] = useState('');
   const [followUpDate, setFollowUpDate] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
+  const isDirty = useMemo(() => {
+    return notes !== '' || interactionType !== 'phone_call' || direction !== 'outbound' || outcome !== '' || linkedBookingId !== '' || followUpDate !== '';
+  }, [notes, interactionType, direction, outcome, linkedBookingId, followUpDate]);
+
+  const { shouldShowDialog, handleConfirmNavigation, handleCancelNavigation, resetBlocker } = useFormDirtyNavigation(isDirty);
+
+  const handleClose = () => {
+    if (isDirty) {
+      setShowCancelConfirm(true);
+    } else {
+      onClose();
+    }
+  };
 
   const interactionTypes = [
     { id: 'phone_call', icon: Phone, label: 'Call' },
@@ -54,6 +71,7 @@ export function CommunicationLogModal({ isOpen, onClose, customerId, tenantId, p
         follow_up_date: mode === 'followup' ? followUpDate : null
       }, tenantId, user!.id);
       
+      resetBlocker();
       showToast("Interaction logged", "success");
       onSuccess();
       onClose();
@@ -65,8 +83,19 @@ export function CommunicationLogModal({ isOpen, onClose, customerId, tenantId, p
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Log interaction">
-      <div className="flex bg-slate-100 p-1 rounded-lg mb-6">
+    <>
+      <Modal 
+        isOpen={isOpen} 
+        onClose={handleClose} 
+        title="Log interaction"
+        footer={
+          <>
+            <Button variant="secondary" onClick={handleClose} disabled={isSubmitting}>Cancel</Button>
+            <Button type="submit" form="communication-log-form" disabled={isSubmitting || notes.length < 10 || (mode === 'followup' && !followUpDate)}>Save</Button>
+          </>
+        }
+      >
+        <div className="flex bg-slate-100 p-1 rounded-lg mb-6">
         <button 
           onClick={() => { setMode('activity'); setFollowUpDate(''); }}
           className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${mode === 'activity' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'}`}
@@ -81,7 +110,7 @@ export function CommunicationLogModal({ isOpen, onClose, customerId, tenantId, p
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form id="communication-log-form" onSubmit={handleSubmit} className="space-y-5">
         <div>
            <label className="block text-sm font-medium text-slate-700 mb-2">Interaction type</label>
            <div className="grid grid-cols-3 gap-2">
@@ -141,11 +170,26 @@ export function CommunicationLogModal({ isOpen, onClose, customerId, tenantId, p
           </div>
         )}
 
-        <div className="pt-6 mt-2 border-t border-slate-200 flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
-          <Button type="submit" disabled={isSubmitting || notes.length < 10 || (mode === 'followup' && !followUpDate)}>Save</Button>
-        </div>
       </form>
     </Modal>
-  );
+
+    <ConfirmDialog
+      isOpen={shouldShowDialog || showCancelConfirm}
+      onClose={() => {
+        handleCancelNavigation();
+        setShowCancelConfirm(false);
+      }}
+      onConfirm={() => {
+        handleConfirmNavigation();
+        setShowCancelConfirm(false);
+        resetBlocker();
+        onClose();
+      }}
+      title="Unsaved Changes"
+      message="You have entered information in the interaction log. Are you sure you want to discard it?"
+      confirmLabel="Discard and Leave"
+      confirmVariant="destructive"
+    />
+  </>
+);
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -8,14 +8,11 @@ import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { getPreBookings } from '@/lib/db/preBookings';
-import { useFinanceEnabled } from '@/lib/catalog/financeConfig';
 import { PreBookingFormModal } from './PreBookingFormModal';
 import { PreBookingStatusModal } from './PreBookingStatusModal';
 
 export function PreBookingsPage() {
   const { tenantId } = useAuthStore(s => s.user!) || {};
-  const navigate = useNavigate();
-  const financeEnabled = useFinanceEnabled();
   const queryClient = useQueryClient();
 
   const [filter, setFilter] = useState('All');
@@ -63,18 +60,18 @@ export function PreBookingsPage() {
   return (
     <PageWrapper 
       title="Pre-bookings" 
-      actions={<Button onClick={() => setIsModalOpen(true)}>+ New pre-booking</Button>}
+      actions={<Button onClick={() => setIsModalOpen(true)}>+ New booking</Button>}
     >
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {[
           { label: 'Enquiry', value: counts?.enquiry },
           { label: 'Confirmed', value: counts?.confirmed },
           { label: 'Ordered', value: counts?.ordered },
           { label: 'In transit', value: counts?.in_transit, alert: hasOverdueTransit }
         ].map(s => (
-          <Card key={s.label} className={`p-4 text-center ${s.alert ? 'border-amber-400 bg-amber-50/50' : ''}`}>
-             <div className="text-xl font-bold">{s.value || 0}</div>
-             <div className={`text-xs uppercase tracking-wider ${s.alert ? 'text-amber-700 font-bold' : 'text-slate-500'}`}>{s.label}</div>
+          <Card key={s.label} className={`p-3 text-center border-slate-200 shadow-sm ${s.alert ? 'border-amber-400 bg-amber-50/50' : ''}`}>
+             <div className="text-xl font-bold text-slate-900 mb-0.5 tracking-tight">{s.value || 0}</div>
+             <div className={`text-[10px] uppercase font-semibold tracking-widest ${s.alert ? 'text-amber-700' : 'text-slate-500'}`}>{s.label}</div>
           </Card>
         ))}
       </div>
@@ -91,76 +88,126 @@ export function PreBookingsPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="sm:hidden space-y-3 pb-6">
         {isLoading ? (
-          [...Array(6)].map((_, i) => <Skeleton key={i} className="h-64 w-full" />)
+          [...Array(3)].map((_, i) => <Skeleton key={i} className="h-28 w-full rounded-xl" />)
         ) : !bookings || bookings.length === 0 ? (
-          <div className="col-span-full py-12 text-center text-slate-500">
-             No pre-bookings found for this filter.
-             <div className="mt-4"><Button variant="secondary" onClick={() => setIsModalOpen(true)}>Create one now</Button></div>
-          </div>
+          <div className="py-8 text-center text-slate-500 text-sm">No bookings found.</div>
         ) : (
           bookings.map((pb: any) => {
             const isPastExpected = pb.expected_delivery_date && new Date(pb.expected_delivery_date) < new Date() && pb.status !== 'delivered' && pb.status !== 'cancelled';
             return (
-              <Card key={pb.id} className="p-5 flex flex-col h-full hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-3">
-                  <Link to={`/sales/customers/${pb.customer_id}`} className="font-bold text-indigo-700 hover:underline line-clamp-1 pr-2">
-                    {pb.customer?.name}
-                  </Link>
-                  <Badge variant={getStatusColor(pb.status) as any} className="capitalize shrink-0">
+              <div 
+                key={pb.id} 
+                className="block bg-white p-4 rounded-xl border border-slate-200 shadow-sm active:bg-slate-50 transition-colors"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <div className="text-sm font-bold text-slate-900 tracking-tight">{pb.customer?.name}</div>
+                    <div className="text-xs font-semibold text-slate-500 mt-0.5">{pb.variant?.name}</div>
+                  </div>
+                  <Badge variant={getStatusColor(pb.status) as any} className="capitalize px-1.5 py-0 border-0 font-bold text-[9px] uppercase tracking-wider">
                     {pb.status.replace('_', ' ')}
                   </Badge>
                 </div>
-
-                <div className="mb-4">
-                  <div className="text-sm font-semibold">{pb.variant?.name}</div>
-                  <div className="text-xs text-slate-500 flex flex-wrap gap-1 mt-1">
-                    <span>{pb.model?.manufacturer}</span>&bull;
-                    <span className="capitalize">{pb.model?.category?.name}</span>&bull;
-                    <span>{pb.powertrain?.display_label}</span>
+                <div className="flex justify-between items-center text-[10px] font-medium text-slate-500 pt-2 border-t border-slate-50">
+                  <div>Booked: {new Date(pb.booking_date).toLocaleDateString()}</div>
+                  <div className={isPastExpected ? 'text-red-500 font-bold' : ''}>
+                    Exp: {pb.expected_delivery_date ? new Date(pb.expected_delivery_date).toLocaleDateString() : '-'}
                   </div>
                 </div>
-
-                <div className="text-xs space-y-2 mb-4 grow">
-                  <div className="flex justify-between border-b border-slate-50 pb-2">
-                    <span className="text-slate-500">Booked:</span>
-                    <span className="font-medium text-slate-900">{new Date(pb.booking_date).toLocaleDateString()}</span>
-                  </div>
-                  <div className={`flex justify-between pb-2 ${pb.inventory_unit ? 'border-b border-slate-50' : ''}`}>
-                    <span className="text-slate-500">Expected:</span>
-                    <span className={`font-medium ${isPastExpected ? 'text-red-600 font-bold' : 'text-slate-900'}`}>
-                      {pb.expected_delivery_date ? new Date(pb.expected_delivery_date).toLocaleDateString() : 'Not set'}
-                    </span>
-                  </div>
-                  {pb.inventory_unit && (
-                    <div className="p-2 bg-slate-50 rounded mt-2">
-                       <span className="text-slate-500 block mb-0.5">Stock unit</span>
-                       <span className="font-mono">{pb.inventory_unit.chassis_number || 'N/A'}</span> <span className="text-slate-400">|</span> <span>{pb.inventory_unit.colour || 'No colour'}</span> <span className="text-slate-400">|</span> <span className="capitalize text-[10px]">{pb.inventory_unit.condition}</span>
-                    </div>
-                  )}
-                  {financeEnabled && (pb.deposit_received || pb.finance_type) && (
-                    <div className="p-2 bg-indigo-50/50 rounded mt-2 flex justify-between items-center">
-                       {pb.deposit_received ? <Badge variant="success" className="text-[10px]">Deposit Recv</Badge> : <span/>}
-                       {pb.finance_type && <span className="font-medium capitalize text-slate-700">{pb.finance_type.replace('_', ' ')}</span>}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex justify-end items-center gap-2 pt-3 border-t border-slate-100">
-                  <Button variant="ghost" size="sm" onClick={() => navigate(`/sales/customers/${pb.customer_id}`)}>View cust</Button>
-                  {pb.status === 'delivered' && !pb.vehicle_id && (
-                    <Button size="sm" onClick={() => navigate(`/sales/vehicles/new?preBookingId=${pb.id}`)}>Convert to sale →</Button>
-                  )}
+                <div className="mt-3 flex justify-end gap-3">
                   {pb.status !== 'cancelled' && pb.status !== 'delivered' && (
-                    <Button variant="secondary" size="sm" onClick={() => setStatusModalBooking({ ...pb, action: 'update' })}>Update status</Button>
+                    <button 
+                      onClick={() => setStatusModalBooking({ ...pb, action: 'update' })}
+                      className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest"
+                    >
+                      Status
+                    </button>
                   )}
+                  <Link to={`/sales/customers/${pb.customer_id}`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                    Customer
+                  </Link>
                 </div>
-              </Card>
+              </div>
             );
           })
         )}
       </div>
+
+      <Card className="hidden sm:block border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-100">
+            <thead className="bg-slate-50/50">
+              <tr>
+                <th scope="col" className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Customer</th>
+                <th scope="col" className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Variant</th>
+                <th scope="col" className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
+                <th scope="col" className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Booked</th>
+                <th scope="col" className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Expected</th>
+                <th scope="col" className="relative px-4 py-3"><span className="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-slate-100">
+              {isLoading ? (
+                [...Array(5)].map((_, i) => (
+                  <tr key={i}>
+                    {[...Array(6)].map((_, j) => (
+                      <td key={j} className="px-4 py-3"><Skeleton className="h-4 w-20" /></td>
+                    ))}
+                  </tr>
+                ))
+              ) : !bookings || bookings.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-slate-500">
+                    No pre-bookings found for this filter.
+                    <div className="mt-4"><Button variant="secondary" size="sm" onClick={() => setIsModalOpen(true)}>Create one now</Button></div>
+                  </td>
+                </tr>
+              ) : (
+                bookings.map((pb: any) => {
+                  const isPastExpected = pb.expected_delivery_date && new Date(pb.expected_delivery_date) < new Date() && pb.status !== 'delivered' && pb.status !== 'cancelled';
+                  return (
+                    <tr key={pb.id} className="hover:bg-slate-50/50 transition-all border-b border-slate-50 last:border-0 growable-row">
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-slate-900 tracking-tight">{pb.customer?.name}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-sm font-semibold text-slate-900">{pb.variant?.name}</div>
+                        <div className="text-[10px] text-slate-500 font-medium">{pb.model?.manufacturer}</div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <Badge variant={getStatusColor(pb.status) as any} className="capitalize px-2 py-0.5 border-0 font-semibold text-[10px] uppercase tracking-wider">
+                          {pb.status.replace('_', ' ')}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-[12px] font-medium text-slate-500">{new Date(pb.booking_date).toLocaleDateString()}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-[12px] font-medium">
+                        <span className={isPastExpected ? 'text-red-600 font-bold' : 'text-slate-600'}>
+                          {pb.expected_delivery_date ? new Date(pb.expected_delivery_date).toLocaleDateString() : '-'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex gap-3 justify-end items-center">
+                          <Link to={`/sales/customers/${pb.customer_id}`} className="text-indigo-600 hover:text-indigo-800 font-semibold text-xs uppercase tracking-wider">
+                            View
+                          </Link>
+                          {pb.status !== 'cancelled' && pb.status !== 'delivered' && (
+                            <button 
+                              onClick={() => setStatusModalBooking({ ...pb, action: 'update' })}
+                              className="text-slate-400 hover:text-slate-900 transition-colors"
+                            >
+                              Status
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
 
       <PreBookingFormModal
         isOpen={isModalOpen}

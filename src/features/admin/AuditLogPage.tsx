@@ -1,13 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { getAuditLogs, AuditLogFilter } from '@/lib/db/audit';
 import { useAuthStore } from '@/features/auth/store/authStore';
-import { Button } from '@/components/ui/Button';
-import { ArrowLeft } from 'lucide-react';
 
 export function AuditLogPage() {
-  const navigate = useNavigate();
   const [logs, setLogs] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
@@ -113,11 +109,7 @@ export function AuditLogPage() {
   return (
     <PageWrapper 
       title="Audit Log"
-      actions={
-        <Button variant="secondary" onClick={() => navigate('/admin')}>
-            <ArrowLeft className="w-4 h-4" /> Back
-        </Button>
-      }
+      backLink={{ label: 'Admin', path: '/admin' }}
     >
       <div className="mb-6 flex flex-wrap gap-4">
         <select 

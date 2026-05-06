@@ -277,7 +277,7 @@ export function NewSalePage() {
   };
 
   return (
-    <PageWrapper title="Record New Sale">
+    <PageWrapper title="Record New Sale" backLink={{ label: 'Vehicles', path: '/sales/vehicles' }}>
       <div className="max-w-4xl mx-auto pb-20">
         
         {/* Stepper */}
@@ -598,17 +598,6 @@ export function NewSalePage() {
                       </div>
                     </div>
                 </Card>
-
-                <div className="flex justify-end mt-12">
-                  <Button 
-                    disabled={selectedVariant.specs?.colour_options?.length > 0 && !selectedColor}
-                    onClick={handleNext}
-                    className="px-10 shadow-lg shadow-indigo-600/10"
-                  >
-                    Continue to vehicle details
-                    <ChevronRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </div>
               </div>
             )}
           </div>
@@ -671,23 +660,6 @@ export function NewSalePage() {
                 </div>
               </div>
             </Card>
-            <div className="flex justify-between items-center mt-8 gap-4">
-              <Button 
-                variant="secondary" 
-                onClick={() => setStep(1)} 
-                className="px-8 shadow-sm"
-              >
-                Back
-              </Button>
-              <Button 
-                disabled={!vehicleNumber || !!vehicleNumberError || !saleDate} 
-                onClick={handleNext} 
-                className="px-10 shadow-lg shadow-indigo-600/10"
-              >
-                Continue to customer
-                <ChevronRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
           </div>
         )}
 
@@ -820,23 +792,6 @@ export function NewSalePage() {
                 )}
               </div>
             </Card>
-            <div className="flex justify-between items-center mt-8">
-              <Button 
-                variant="secondary" 
-                onClick={() => setStep(2)} 
-                className="px-8 shadow-sm"
-              >
-                Back
-              </Button>
-              <Button 
-                disabled={!selectedCustomer} 
-                onClick={handleNext} 
-                className="px-10 shadow-lg shadow-indigo-600/10"
-              >
-                Continue to confirm
-                <ChevronRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
           </div>
         )}
 
@@ -921,19 +876,6 @@ export function NewSalePage() {
               </div>
             </Card>
 
-              <div className="flex justify-between items-center gap-4">
-                <Button variant="secondary" onClick={() => setStep(3)} className="px-8 shadow-sm">
-                  Back
-                </Button>
-                <Button 
-                  className="w-full md:w-auto px-12 shadow-lg shadow-indigo-600/20" 
-                  onClick={() => recordSaleMutation.mutate()} 
-                  disabled={recordSaleMutation.isPending}
-                >
-                  {recordSaleMutation.isPending ? 'Recording...' : 'Record sale'}
-                </Button>
-              </div>
-
               {/* Success Dialog */}
               {recordedSale && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
@@ -978,8 +920,70 @@ export function NewSalePage() {
                   </div>
                 </div>
               )}
-            </div>
+          </div>
         )}
+
+        {/* Configure Footer Actions based on current step */}
+        <div className="fixed bottom-0 left-0 right-0 lg:left-64 bg-white/80 backdrop-blur-md border-t border-slate-200 py-4 px-6 lg:px-8 z-50">
+          <div className="max-w-4xl mx-auto flex justify-between items-center gap-3 w-full">
+            <div className="flex gap-3">
+              {step > 1 && (
+                <Button 
+                  variant="secondary" 
+                  onClick={() => setStep(s => s - 1)}
+                  disabled={recordSaleMutation.isPending}
+                >
+                  Back
+                </Button>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              {step === 1 && (
+                <Button 
+                  disabled={!selectedVariant || (selectedVariant.specs?.colour_options?.length > 0 && !selectedColor)} 
+                  onClick={handleNext} 
+                  className="px-10 shadow-lg shadow-indigo-600/10"
+                >
+                  Continue to vehicle details
+                  <ChevronRight className="w-4 h-4 ml-2" />
+                </Button>
+              )}
+
+              {step === 2 && (
+                <Button 
+                  disabled={!vehicleNumber || !!vehicleNumberError || !saleDate} 
+                  onClick={handleNext} 
+                  className="px-10 shadow-lg shadow-indigo-600/10"
+                >
+                  Continue to customer
+                  <ChevronRight className="w-4 h-4 ml-2" />
+                </Button>
+              )}
+
+              {step === 3 && (
+                <Button 
+                  disabled={!selectedCustomer} 
+                  onClick={handleNext} 
+                  className="px-10 shadow-lg shadow-indigo-600/10"
+                >
+                  Continue to confirm
+                  <ChevronRight className="w-4 h-4 ml-2" />
+                </Button>
+              )}
+
+              {step === 4 && (
+                <Button 
+                  className="px-12 shadow-lg shadow-indigo-600/20" 
+                  onClick={() => recordSaleMutation.mutate()} 
+                  disabled={recordSaleMutation.isPending}
+                >
+                  {recordSaleMutation.isPending ? 'Recording...' : 'Record sale'}
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* Global Confirmation Dialog for Navigation */}
         <ConfirmDialog

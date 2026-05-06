@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Switch } from '@/components/ui/Switch';
 import { useToast } from '@/hooks/useToast';
-import { Save, Info, X, ChevronLeft } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { Save, Info, X } from 'lucide-react';
+import { useFormDirtyNavigation } from '@/hooks/useFormDirtyNavigation';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase/client';
 import { SEEDED_MANUFACTURERS } from '@/constants/manufacturers';
@@ -80,6 +82,23 @@ export function CatalogSettingsPage() {
     }
   }, [config]);
 
+  const isActuallyDirty = useMemo(() => {
+    if (!config) return false;
+    const currentConfig = {
+      enabled_category_ids: config.enabled_category_ids || [],
+      enabled_powertrain_ids: config.enabled_powertrain_ids || [],
+      manufacturers: config.manufacturers || [],
+      default_service_interval_km: config.default_service_interval_km || 10000,
+      default_service_interval_months: config.default_service_interval_months || 6,
+      regulatory_market: config.regulatory_market || 'IN',
+      currency: config.currency || 'INR',
+      finance_tracking_enabled: config.finance_tracking_enabled || false
+    };
+    return JSON.stringify(formState) !== JSON.stringify(currentConfig);
+  }, [formState, config]);
+
+  const { shouldShowDialog, handleConfirmNavigation, handleCancelNavigation, resetBlocker } = useFormDirtyNavigation(isActuallyDirty);
+
   const handleMarketChange = (val: string) => {
     setFormState(prev => {
       let nextCurrency = prev.currency;
@@ -99,6 +118,7 @@ export function CatalogSettingsPage() {
   const mutation = useMutation({
     mutationFn: (data: typeof formState) => upsertTenantCatalogConfig(tenantId!, data),
     onSuccess: () => {
+      resetBlocker();
       queryClient.invalidateQueries({ queryKey: ['tenant_catalog_config', tenantId] });
       showToast('Catalog settings saved successfully', 'success');
     },
@@ -159,12 +179,7 @@ export function CatalogSettingsPage() {
   return (
     <PageWrapper 
       title="Catalog Settings"
-      actions={
-        <Button variant="secondary" onClick={() => navigate('/admin')} className="h-9">
-          <ChevronLeft className="w-4 h-4" />
-          Back to Dashboard
-        </Button>
-      }
+      backLink={{ label: 'Admin', path: '/admin' }}
     >
       <div className="space-y-8 pb-20">
         {/* Section 1: Categories */}
@@ -354,14 +369,27 @@ export function CatalogSettingsPage() {
             </div>
         </section>
 
-        <div className="flex justify-end gap-3 p-6 bg-slate-50 border-t border-slate-200 rounded-b-lg -mx-0">
-          <Button variant="secondary" onClick={() => window.history.back()}>Cancel</Button>
-          <Button disabled={mutation.isPending} onClick={() => mutation.mutate(formState)}>
-            <Save className="w-4 h-4" />
-            {mutation.isPending ? 'Saving...' : 'Save Settings'}
-          </Button>
+        {/* Sticky Bottom Bar */}
+        <div className="fixed bottom-0 left-0 right-0 lg:left-64 bg-white/80 backdrop-blur-md border-t border-slate-200 py-4 px-6 lg:px-8 z-50">
+          <div className="max-w-4xl mx-auto flex justify-end gap-3 w-full">
+            <Button variant="secondary" onClick={() => navigate('/admin')}>Cancel</Button>
+            <Button disabled={mutation.isPending} onClick={() => mutation.mutate(formState)}>
+              <Save className="w-4 h-4 mr-2" />
+              {mutation.isPending ? 'Saving...' : 'Save Settings'}
+            </Button>
+          </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        isOpen={shouldShowDialog}
+        onClose={handleCancelNavigation}
+        onConfirm={handleConfirmNavigation}
+        title="Unsaved Changes"
+        message="You have unsaved changes in catalog settings. Are you sure you want to leave? Your changes will be lost."
+        confirmLabel="Discard and Leave"
+        confirmVariant="destructive"
+      />
     </PageWrapper>
   );
 }

@@ -13,6 +13,8 @@ import { Switch } from '@/components/ui/Switch';
 import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/hooks/useToast';
 import { ArrowLeft, Save, Plus, Check, X, AlertTriangle } from 'lucide-react';
+import { useFormDirtyNavigation } from '@/hooks/useFormDirtyNavigation';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { supabase } from '@/lib/supabase/client';
 import { Modal } from '@/components/ui/Modal';
 
@@ -95,7 +97,7 @@ export function VariantFormV2() {
   );
 
   // Form setup
-  const { register, handleSubmit, watch, setValue, formState: { } } = useForm({
+  const { register, handleSubmit, watch, setValue, formState: { isDirty: rhfIsDirty } } = useForm({
     defaultValues: {
       name: '',
       sku: '',
@@ -111,6 +113,9 @@ export function VariantFormV2() {
     }
   });
 
+  const [initialFeatures, setInitialFeatures] = useState<string>('{}');
+  const [initialPowertrainId, setInitialPowertrainId] = useState<string | null>(null);
+
   useEffect(() => {
     if (variantInit) {
       setValue('name', variantInit.name);
@@ -125,18 +130,26 @@ export function VariantFormV2() {
       setValue('price', variantInit.price || 0);
       setValue('specs', variantInit.specs || {});
       setSelectedPowertrainId(variantInit.powertrain_type_id);
+      setInitialPowertrainId(variantInit.powertrain_type_id);
 
       const featureMap: Record<string, 'standard' | 'optional' | 'none'> = {};
       variantInit.features?.forEach((f: any) => {
           featureMap[f.id] = f.is_standard ? 'standard' : 'optional';
       });
       setSelectedFeatures(featureMap);
+      setInitialFeatures(JSON.stringify(featureMap));
     } else if (currentModel) {
       // Pre-fill manufacturer and year for new variants
       if (currentModel.manufacturer) setValue('specs.manufacturer', currentModel.manufacturer);
       if (currentModel.year_from) setValue('specs.model_year', currentModel.year_from);
     }
   }, [variantInit, currentModel, setValue]);
+
+  const featuresChanged = useMemo(() => JSON.stringify(selectedFeatures) !== initialFeatures, [selectedFeatures, initialFeatures]);
+  const powertrainChanged = selectedPowertrainId !== initialPowertrainId;
+  const isActuallyDirty = rhfIsDirty || featuresChanged || powertrainChanged;
+
+  const { shouldShowDialog, handleConfirmNavigation, handleCancelNavigation, resetBlocker } = useFormDirtyNavigation(isActuallyDirty);
 
   const { data: features } = useQuery({
       queryKey: ['features', tenantId],
@@ -161,6 +174,7 @@ export function VariantFormV2() {
             : createVariant(savePayload, featuresToSave, tenantId!);
     },
     onSuccess: () => {
+        resetBlocker();
         showToast(`Variant ${isEdit ? 'updated' : 'created'} successfully`, 'success');
         queryClient.invalidateQueries({ queryKey: ['all_vehicle_variants'] });
         queryClient.invalidateQueries({ queryKey: ['vehicle_models'] });
@@ -248,11 +262,7 @@ export function VariantFormV2() {
   return (
     <PageWrapper 
       title={isEdit ? "Edit Variant" : "Add Variant"}
-      actions={
-        <Button variant="secondary" onClick={() => navigate('/admin/catalog')}>
-          <ArrowLeft className="w-4 h-4" /> Back
-        </Button>
-      }
+      backLink={{ label: 'Catalog', path: '/admin/catalog' }}
     >
       <div className="space-y-8 pb-32">
         <Card className="p-6">
@@ -630,6 +640,12 @@ export function VariantFormV2() {
             isOpen={isFeatureModalOpen} 
             onClose={() => setIsFeatureModalOpen(false)}
             title="Add Custom Feature"
+            footer={(
+                <div className="flex justify-end gap-3 w-full">
+                    <Button variant="secondary" onClick={() => setIsFeatureModalOpen(false)}>Cancel</Button>
+                    <Button onClick={handleCreateFeature}>Create Feature</Button>
+                </div>
+            )}
         >
             <div className="space-y-4 pt-4">
                 <Input 
@@ -653,10 +669,6 @@ export function VariantFormV2() {
                         <option value="performance">Performance</option>
                     </select>
                 </div>
-                <div className="flex justify-end gap-3 mt-6">
-                    <Button variant="secondary" onClick={() => setIsFeatureModalOpen(false)}>Cancel</Button>
-                    <Button onClick={handleCreateFeature}>Create Feature</Button>
-                </div>
             </div>
         </Modal>
 
@@ -665,6 +677,17 @@ export function VariantFormV2() {
             isOpen={isColorModalOpen}
             onClose={() => setIsColorModalOpen(false)}
             title="Add Color Option"
+            footer={(
+                <div className="flex justify-end gap-3 w-full">
+                    <Button variant="secondary" onClick={() => setIsColorModalOpen(false)}>Cancel</Button>
+                    <Button onClick={() => {
+                        const current = watch('specs.colour_options') || [];
+                        setValue('specs.colour_options', [...current, newColor]);
+                        setIsColorModalOpen(false);
+                        setNewColor({ hex: '#FFFFFF', name: '' });
+                    }}>Add to Variant</Button>
+                </div>
+            )}
         >
             <div className="space-y-6 pt-4">
                 <div>
@@ -709,32 +732,20 @@ export function VariantFormV2() {
                         />
                     </div>
                 </div>
-
-                <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-slate-100">
-                    <Button variant="secondary" onClick={() => setIsColorModalOpen(false)}>Cancel</Button>
-                    <Button onClick={() => {
-                        const current = watch('specs.colour_options') || [];
-                        setValue('specs.colour_options', [...current, newColor]);
-                        setIsColorModalOpen(false);
-                        setNewColor({ hex: '#FFFFFF', name: '' });
-                    }}>Add to Variant</Button>
-                </div>
             </div>
         </Modal>
 
         {/* Sticky Bottom Bar */}
         <div className="fixed bottom-0 left-0 right-0 lg:left-64 bg-white/80 backdrop-blur-md border-t border-slate-200 py-4 px-6 lg:px-8 z-50">
-            <div className="max-w-7xl mx-auto flex justify-between items-center w-full">
-                <Button variant="secondary" onClick={() => navigate('/admin/catalog')}>Discard Changes</Button>
-                <div className="flex gap-3">
-                    <Button variant="secondary" disabled={mutation.isPending} onClick={() => onSave('draft')}>
-                        Save as Draft
-                    </Button>
-                    <Button disabled={mutation.isPending} onClick={() => onSave('active')}>
-                        <Save className="w-4 h-4" />
-                        {mutation.isPending ? 'Saving...' : 'Save and Activate'}
-                    </Button>
-                </div>
+            <div className="max-w-7xl mx-auto flex justify-center items-center gap-3 w-full">
+                <Button variant="secondary" className="whitespace-nowrap" disabled={mutation.isPending} onClick={() => onSave('draft')}>
+                    <Check className="w-4 h-4" />
+                    Save as Draft
+                </Button>
+                <Button className="whitespace-nowrap" disabled={mutation.isPending} onClick={() => onSave('active')}>
+                    <Save className="w-4 h-4" />
+                    {mutation.isPending ? 'Saving...' : 'Save and Activate'}
+                </Button>
             </div>
         </div>
 
@@ -758,6 +769,17 @@ export function VariantFormV2() {
                 </div>
             </div>
         </Modal>
+
+        {/* Navigation Blocker Dialog */}
+        <ConfirmDialog
+          isOpen={shouldShowDialog}
+          onClose={handleCancelNavigation}
+          onConfirm={handleConfirmNavigation}
+          title="Unsaved Changes"
+          message="You have unsaved changes in this variant form. Navigating away will cause you to lose all edited information. Are you sure you want to discard changes?"
+          confirmLabel="Discard and Leave"
+          confirmVariant="destructive"
+        />
       </div>
     </PageWrapper>
   );

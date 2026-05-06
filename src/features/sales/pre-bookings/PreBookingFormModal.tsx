@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
@@ -8,6 +8,8 @@ import { getVariantsForSale } from '@/lib/db/vehicles';
 import { getInventoryUnits } from '@/lib/db/inventory';
 import { useFinanceEnabled } from '@/lib/catalog/financeConfig';
 import { useToast } from '@/hooks/useToast';
+import { useFormDirtyNavigation } from '@/hooks/useFormDirtyNavigation';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 export function PreBookingFormModal({ isOpen, onClose, customerId, customerName, tenantId, onSuccess }: any) {
   const { user } = useAuthStore();
@@ -34,6 +36,27 @@ export function PreBookingFormModal({ isOpen, onClose, customerId, customerName,
   const [monthlyInstalment, setMonthlyInstalment] = useState('');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
+  const isDirty = useMemo(() => {
+    return selectedCategoryId !== '' || 
+           selectedModelId !== '' || 
+           selectedVariantId !== '' || 
+           colourPreference !== '' || 
+           specialRequirements !== '' || 
+           depositAmount !== '' ||
+           linkStockUnit;
+  }, [selectedCategoryId, selectedModelId, selectedVariantId, colourPreference, specialRequirements, depositAmount, linkStockUnit]);
+
+  const { shouldShowDialog, handleConfirmNavigation, handleCancelNavigation, resetBlocker } = useFormDirtyNavigation(isDirty);
+
+  const handleClose = () => {
+    if (isDirty) {
+      setShowCancelConfirm(true);
+    } else {
+      onClose();
+    }
+  };
 
   const { data: variantsData } = useQuery({
     queryKey: ['variants_for_sale', tenantId],
@@ -83,6 +106,7 @@ export function PreBookingFormModal({ isOpen, onClose, customerId, customerName,
       }
 
       await createPreBooking(data, tenantId, user!.id);
+      resetBlocker();
       showToast("Pre-booking created", "success");
       onSuccess();
       onClose();
@@ -94,8 +118,19 @@ export function PreBookingFormModal({ isOpen, onClose, customerId, customerName,
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`New pre-booking for ${customerName}`}>
-      <form onSubmit={handleSubmit} className="space-y-6">
+    <>
+      <Modal 
+        isOpen={isOpen} 
+        onClose={handleClose} 
+        title={`New pre-booking for ${customerName}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={handleClose} disabled={isSubmitting}>Cancel</Button>
+            <Button type="submit" form="pre-booking-form" disabled={isSubmitting || !selectedVariantId}>Create pre-booking</Button>
+          </>
+        }
+      >
+        <form id="pre-booking-form" onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-4">
           <div>
              <label className="block text-sm font-medium text-slate-700 mb-2">Category</label>
@@ -226,12 +261,26 @@ export function PreBookingFormModal({ isOpen, onClose, customerId, customerName,
              </div>
           </div>
         )}
-
-        <div className="pt-6 mt-6 border-t border-slate-200 flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
-          <Button type="submit" disabled={isSubmitting || !selectedVariantId}>Create pre-booking</Button>
-        </div>
       </form>
     </Modal>
-  );
+
+    <ConfirmDialog
+      isOpen={shouldShowDialog || showCancelConfirm}
+      onClose={() => {
+        handleCancelNavigation();
+        setShowCancelConfirm(false);
+      }}
+      onConfirm={() => {
+        handleConfirmNavigation();
+        setShowCancelConfirm(false);
+        resetBlocker();
+        onClose();
+      }}
+      title="Unsaved Changes"
+      message="You have entered information for a pre-booking. Are you sure you want to discard these details?"
+      confirmLabel="Discard and Leave"
+      confirmVariant="destructive"
+    />
+  </>
+);
 }

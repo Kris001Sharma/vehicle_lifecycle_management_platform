@@ -61,20 +61,52 @@ export function CustomersPage() {
         />
       </div>
 
-      <Card>
+      <div className="sm:hidden space-y-3">
+        {isLoading ? (
+          [...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)
+        ) : data?.rows.length === 0 ? (
+          <div className="py-8 text-center text-slate-500 text-sm">No customers found.</div>
+        ) : (
+          data?.rows.map((customer: any) => (
+            <Link 
+              key={customer.id} 
+              to={`/sales/customers/${customer.id}`}
+              className="block bg-white p-4 rounded-xl border border-slate-200 shadow-sm active:bg-slate-50 transition-colors"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="font-bold text-slate-900 tracking-tight">{customer.name}</div>
+                  <div className="text-xs text-slate-500 font-medium mt-0.5">{customer.phone}</div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <Badge variant={getBadgeColor(customer.customer_type)} className="text-[9px] px-1.5 py-0 border-0 font-bold uppercase tracking-wider">
+                    {customer.customer_type.replace('_', ' ')}
+                  </Badge>
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 bg-indigo-50 rounded-full">
+                    <span className="text-[10px] font-bold text-indigo-600">{customer.vehicles?.length || 0}</span>
+                    <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-tighter">Units</span>
+                  </div>
+                </div>
+              </div>
+            </Link>
+          ))
+        )}
+      </div>
+
+      <Card className="hidden sm:block border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
+          <table className="min-w-full divide-y divide-slate-100">
+            <thead className="bg-slate-50/50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Type</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Phone / City</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Vehicles</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Added</th>
-                <th scope="col" className="relative px-6 py-3"><span className="sr-only">Actions</span></th>
+                <th scope="col" className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Name</th>
+                <th scope="col" className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Type</th>
+                <th scope="col" className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Phone / City</th>
+                <th scope="col" className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Vehicles</th>
+                <th scope="col" className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Added</th>
+                <th scope="col" className="relative px-4 py-3"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-slate-200">
+            <tbody className="bg-white divide-y divide-slate-100">
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i}>
@@ -99,31 +131,31 @@ export function CustomersPage() {
                 </tr>
               ) : (
                 data?.rows.map((customer: any) => (
-                  <tr key={customer.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-slate-900">{customer.name}</div>
-                      {customer.email && <div className="text-sm text-slate-500">{customer.email}</div>}
+                  <tr key={customer.id} className="hover:bg-slate-50/50 transition-all border-b border-slate-50 last:border-0">
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-sm font-semibold text-slate-900 tracking-tight">{customer.name}</div>
+                      {customer.email && <div className="text-[11px] font-medium text-slate-500">{customer.email}</div>}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Badge variant={getBadgeColor(customer.customer_type)}>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <Badge variant={getBadgeColor(customer.customer_type)} className="capitalize px-2 py-0.5 border-0 font-semibold text-[10px] uppercase tracking-wider">
                         {customer.customer_type.replace('_', ' ')}
                       </Badge>
-                      {customer.fleet_name && <div className="text-xs text-slate-500 mt-1">{customer.fleet_name}</div>}
+                      {customer.fleet_name && <div className="text-[10px] text-slate-500 mt-1 font-semibold uppercase tracking-tight">{customer.fleet_name}</div>}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-slate-900">{customer.phone}</div>
-                      <div className="text-sm text-slate-500">{customer.city || '-'}</div>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-sm font-semibold text-slate-800 tracking-tight">{customer.phone}</div>
+                      <div className="text-[11px] font-medium text-slate-500">{customer.city || '-'}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <Link to={`/sales/customers/${customer.id}`} className="text-sm font-medium text-indigo-600 hover:text-indigo-900 text-center block w-8">
-                        -
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <Link to={`/sales/customers/${customer.id}`} className="text-xs font-bold text-indigo-600 hover:text-indigo-900 bg-indigo-50 w-8 h-8 flex items-center justify-center rounded-full transition-colors">
+                        {customer.vehicles?.length || 0}
                       </Link>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                    <td className="px-4 py-3 whitespace-nowrap text-[12px] font-medium text-slate-500">
                       {new Date(customer.created_at).toLocaleDateString()}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Link to={`/sales/customers/${customer.id}`} className="text-indigo-600 hover:text-indigo-900">
+                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                      <Link to={`/sales/customers/${customer.id}`} className="inline-flex items-center text-indigo-600 hover:text-indigo-800 font-semibold text-xs uppercase tracking-wider">
                         View
                       </Link>
                     </td>
@@ -135,13 +167,13 @@ export function CustomersPage() {
         </div>
         
         {data && data.totalCount > pageSize && (
-          <div className="px-6 py-4 border-t border-slate-200 flex items-center justify-between">
-            <span className="text-sm text-slate-500">
-              Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, data.totalCount)} of {data.totalCount} customers
+          <div className="px-4 py-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, data.totalCount)} of {data.totalCount}
             </span>
-            <div className="flex gap-2">
-              <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
-              <Button variant="secondary" size="sm" onClick={() => setPage(p => p + 1)} disabled={page * pageSize >= data.totalCount}>Next</Button>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button variant="secondary" size="sm" className="flex-1 sm:flex-none h-8 text-[10px] font-bold uppercase tracking-wider" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
+              <Button variant="secondary" size="sm" className="flex-1 sm:flex-none h-8 text-[10px] font-bold uppercase tracking-wider" onClick={() => setPage(p => p + 1)} disabled={page * pageSize >= data.totalCount}>Next</Button>
             </div>
           </div>
         )}

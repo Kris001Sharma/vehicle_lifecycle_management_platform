@@ -91,25 +91,25 @@ export function SalesDashboard() {
   };
 
   return (
-    <PageWrapper title="Sales">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="p-6">
-          <h3 className="text-sm font-medium text-slate-500 mb-2">Total customers</h3>
+    <PageWrapper title="Sales Dashboard">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+        <Card className="p-5 border-slate-200 shadow-sm">
+          <h3 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Total customers</h3>
           {statsLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-3xl font-bold text-slate-900">{stats?.customers}</div>}
         </Card>
-        <Card className="p-6">
-          <h3 className="text-sm font-medium text-slate-500 mb-2">Total vehicles sold</h3>
+        <Card className="p-5 border-slate-200 shadow-sm">
+          <h3 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Total vehicles</h3>
           {statsLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-3xl font-bold text-slate-900">{stats?.vehicles}</div>}
         </Card>
         <Link to="/sales/inventory" className="block outline-none hover:ring-2 hover:ring-indigo-600 rounded-xl transition-all">
-          <Card className="p-6 h-full transition-shadow hover:shadow-md">
-            <h3 className="text-sm font-medium text-slate-500 mb-2">In stock</h3>
+          <Card className="p-5 h-full transition-shadow hover:shadow-md border-slate-200 shadow-sm">
+            <h3 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">In stock</h3>
             {invLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-3xl font-bold text-slate-900">{inventoryStats?.in_stock || 0}</div>}
           </Card>
         </Link>
         <Link to="/sales/pre-bookings" className="block outline-none hover:ring-2 hover:ring-indigo-600 rounded-xl transition-all">
-          <Card className="p-6 h-full transition-shadow hover:shadow-md">
-            <h3 className="text-sm font-medium text-slate-500 mb-2">Awaiting delivery</h3>
+          <Card className="p-5 h-full transition-shadow hover:shadow-md border-slate-200 shadow-sm">
+            <h3 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1">Awaiting delivery</h3>
             {pbLoading ? <Skeleton className="h-8 w-16" /> : <div className="text-3xl font-bold text-slate-900">{activePreBookings?.length || 0}</div>}
           </Card>
         </Link>
@@ -161,33 +161,36 @@ export function SalesDashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <Card className="p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-semibold text-slate-900">Recent sales</h3>
-            <Link to="/sales/vehicles" className="text-sm font-medium text-indigo-600 hover:text-indigo-700">View all</Link>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+        <Card className="p-5 border-slate-200 shadow-sm">
+          <div className="flex justify-between items-center mb-4 md:mb-6">
+            <h3 className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Recent sales</h3>
+            <Link to="/sales/vehicles" className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700 uppercase tracking-wider">View all</Link>
           </div>
           {recentLoading ? (
             <div className="space-y-4">
               {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
           ) : recentSales && recentSales.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-1">
               {recentSales.map((v: any) => (
                 <Link 
                   key={v.id} 
                   to={`/sales/vehicles/${v.id}`}
-                  className="flex justify-between items-center pb-4 border-b border-slate-100 last:border-0 last:pb-0 hover:bg-slate-50 transition-colors"
+                  className="flex justify-between items-center p-2 rounded-lg border border-transparent hover:border-slate-100 hover:bg-slate-50 transition-all group"
                 >
-                  <div>
-                    <div className="font-mono text-sm font-medium text-slate-900">{v.vehicle_number}</div>
-                    <div className="text-xs text-slate-500">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-sm text-slate-900 tracking-tight flex items-center gap-2">
+                       {v.vehicle_number}
+                       <span className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-indigo-600 font-bold uppercase tracking-widest">View →</span>
+                    </div>
+                    <div className="text-[11px] font-medium text-slate-500 mt-0.5 truncate">
                       {v.variant?.model?.manufacturer} {v.variant?.model?.name}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm text-slate-900">{v.customer?.name}</div>
-                    <div className="text-xs text-slate-500">{new Date(v.sale_date).toLocaleDateString()}</div>
+                  <div className="text-right shrink-0 ml-4">
+                    <div className="text-sm font-semibold text-slate-800 tracking-tight">{v.customer?.name}</div>
+                    <div className="text-[10px] font-bold text-slate-400 mt-0.5 uppercase tracking-wider">{new Date(v.sale_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</div>
                   </div>
                 </Link>
               ))}

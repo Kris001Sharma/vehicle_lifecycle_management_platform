@@ -59,7 +59,7 @@ export function CustomerDetailPage() {
 
   if (isLoadingCustomer) {
     return (
-      <PageWrapper title={<Skeleton className="h-8 w-48" />} backLink={{ label: '← Customers', path: '/sales/customers' }}>
+      <PageWrapper title={<Skeleton className="h-8 w-48" />} backLink={{ label: 'Customers', path: '/sales/customers' }}>
         <div className="space-y-6">
           <Skeleton className="h-64 w-full" />
         </div>
@@ -69,7 +69,7 @@ export function CustomerDetailPage() {
 
   if (customerError || !customer) {
     return (
-      <PageWrapper title="Customer not found" backLink={{ label: '← Customers', path: '/sales/customers' }}>
+      <PageWrapper title="Customer not found" backLink={{ label: 'Customers', path: '/sales/customers' }}>
         <div className="text-center py-12">
           <div className="text-slate-500 mb-4">The requested customer could not be found.</div>
           <Button onClick={() => navigate('/sales/customers')}>Back to list</Button>
@@ -104,12 +104,7 @@ export function CustomerDetailPage() {
   return (
     <PageWrapper
       title={customer.name}
-      backLink={{ label: '← Customers', path: '/sales/customers' }}
-      actions={
-        <Button variant="secondary" onClick={() => navigate(`/sales/customers/${customerId}/edit`)}>
-          Edit customer
-        </Button>
-      }
+      backLink={{ label: 'Customers', path: '/sales/customers' }}
     >
       <div className="mb-6 border-b border-slate-200">
         <nav className="-mb-px flex space-x-6">
@@ -149,13 +144,13 @@ export function CustomerDetailPage() {
                   <div>
                     <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Phone</label>
                     <div className="mt-1">
-                      <a href={`tel:${customer.phone}`} className="hover:text-indigo-600">{customer.phone}</a>
+                      <a href={`tel:${customer.phone}`} className="hover:text-indigo-600 font-medium">{customer.phone}</a>
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-500 uppercase tracking-wide">Email</label>
                     <div className="mt-1 truncate">
-                      {customer.email ? <a href={`mailto:${customer.email}`} className="hover:text-indigo-600">{customer.email}</a> : <span className="italic text-slate-400">Not provided</span>}
+                      {customer.email ? <a href={`mailto:${customer.email}`} className="hover:text-indigo-600 font-medium">{customer.email}</a> : <span className="italic text-slate-400">Not provided</span>}
                     </div>
                   </div>
                   <div>
@@ -177,7 +172,7 @@ export function CustomerDetailPage() {
                     </div>
                   </div>
                   <div className="pt-4 border-t border-slate-100">
-                    <Button variant="secondary" size="sm" onClick={() => navigate(`/sales/customers/${customerId}/edit`)}>Edit</Button>
+                    <Button variant="secondary" size="sm" onClick={() => navigate(`/sales/customers/${customerId}/edit`)}>Edit Detail</Button>
                   </div>
                 </div>
               </Card>
@@ -198,6 +193,7 @@ export function CustomerDetailPage() {
               <Card className="p-6">
                 <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-3">
                   <h2 className="text-lg font-semibold text-slate-900">Vehicles ({customer.vehicles?.length || 0})</h2>
+                  <Link to={`/sales/vehicles/new?customerId=${customerId}`} className="text-sm font-medium text-indigo-600 hover:text-indigo-700">+ New Sale</Link>
                 </div>
                 
                 {!customer.vehicles || customer.vehicles.length === 0 ? (

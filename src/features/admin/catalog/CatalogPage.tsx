@@ -214,13 +214,13 @@ function CatalogContent() {
                                         )}
                                     </div>
 
-                                    <div className="mt-4 pt-4 border-t border-slate-100 flex justify-end gap-2 items-center">
-                                        <div className="flex gap-2">
-                                            <Button variant="secondary" size="sm" onClick={() => navigate(`/admin/catalog/models/${model.id}/edit`)}>
-                                                <Edit2 className="w-3.5 h-3.5 mr-1" /> Edit Model
+                                    <div className="mt-4 pt-4 border-t border-slate-100 flex justify-center gap-2 items-center">
+                                        <div className="flex flex-wrap justify-center gap-2">
+                                            <Button variant="secondary" size="sm" className="whitespace-nowrap flex items-center gap-1.5" onClick={() => navigate(`/admin/catalog/models/${model.id}/edit`)}>
+                                                <Edit2 className="w-3.5 h-3.5" /> Edit Model
                                             </Button>
-                                            <Button size="sm" onClick={() => navigate(`/admin/catalog/variants/new?model_id=${model.id}`)}>
-                                                <Plus className="w-3.5 h-3.5 mr-1" /> Add Variant
+                                            <Button size="sm" className="whitespace-nowrap flex items-center gap-1.5" onClick={() => navigate(`/admin/catalog/variants/new?model_id=${model.id}`)}>
+                                                <Plus className="w-3.5 h-3.5" /> Add Variant
                                             </Button>
                                         </div>
                                     </div>

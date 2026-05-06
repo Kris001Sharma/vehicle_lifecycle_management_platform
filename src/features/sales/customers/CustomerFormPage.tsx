@@ -8,7 +8,8 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/hooks/useToast';
 import { useAuthStore } from '@/features/auth/store/authStore';
-import { useFormDirtyBlocker } from '@/hooks/useFormDirtyBlocker';
+import { useFormDirtyNavigation } from '@/hooks/useFormDirtyNavigation';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { customerSchema } from '@/lib/validations/customers';
 import { checkPhoneDuplicate, createCustomer, updateCustomer, getCustomerById } from '@/lib/db/customers';
 import { supabase } from '@/lib/supabase/client';
@@ -37,7 +38,7 @@ export function CustomerFormPage() {
     }
   });
 
-  const { reset: resetBlocker } = useFormDirtyBlocker(isDirty);
+  const { shouldShowDialog, handleConfirmNavigation, handleCancelNavigation, resetBlocker } = useFormDirtyNavigation(isDirty);
 
   useQuery({
     queryKey: ['customer', customerId, tenantId],
@@ -144,7 +145,7 @@ export function CustomerFormPage() {
   return (
     <PageWrapper
       title={isEdit ? 'Edit Customer' : 'Add New Customer'}
-      backLink={{ label: '← Back', path: isEdit ? `/sales/customers/${customerId}` : '/sales/customers' }}
+      backLink={{ label: isEdit ? 'Customer Detail' : 'Customers', path: isEdit ? `/sales/customers/${customerId}` : '/sales/customers' }}
     >
       <div className="max-w-2xl mx-auto pb-12">
         <Card className="p-6">
@@ -248,21 +249,35 @@ export function CustomerFormPage() {
               {errors.fleet_name && <p className="text-red-500 text-xs mt-1">{errors.fleet_name.message as string}</p>}
             </div>
 
-            <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
-              <Link 
-                to={isEdit ? `/sales/customers/${customerId}` : '/sales/customers'} 
-                className="text-sm font-medium text-slate-600 hover:text-slate-900"
-              >
-                Cancel
-              </Link>
-              <Button type="submit" disabled={isSubmitting || mutation.isPending}>
-                {isSubmitting || mutation.isPending ? 'Saving...' : 'Save customer'}
-              </Button>
-            </div>
+            <div className="h-20" /> {/* Spacer for sticky footer */}
 
+            {/* Sticky Bottom Bar */}
+            <div className="fixed bottom-0 left-0 right-0 lg:left-64 bg-white/80 backdrop-blur-md border-t border-slate-200 py-4 px-6 lg:px-8 z-50">
+              <div className="max-w-2xl mx-auto flex items-center justify-between gap-3 w-full">
+                <Link 
+                  to={isEdit ? `/sales/customers/${customerId}` : '/sales/customers'} 
+                  className="text-sm font-medium text-slate-600 hover:text-slate-900"
+                >
+                  Cancel
+                </Link>
+                <Button type="submit" disabled={isSubmitting || mutation.isPending}>
+                  {isSubmitting || mutation.isPending ? 'Saving...' : 'Save customer'}
+                </Button>
+              </div>
+            </div>
           </form>
         </Card>
       </div>
+
+      <ConfirmDialog
+        isOpen={shouldShowDialog}
+        onClose={handleCancelNavigation}
+        onConfirm={handleConfirmNavigation}
+        title="Unsaved Changes"
+        message="You have unsaved changes in this customer form. Are you sure you want to leave? All your edited information will be lost."
+        confirmLabel="Discard and Leave"
+        confirmVariant="destructive"
+      />
     </PageWrapper>
   );
 }

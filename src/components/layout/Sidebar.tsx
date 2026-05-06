@@ -16,16 +16,17 @@ interface SidebarProps {
   role: 'admin' | 'sales' | 'service';
   navItems: NavItem[];
   currentPath: string;
+  onItemClick?: () => void;
 }
 
-export function Sidebar({ role, navItems, currentPath }: SidebarProps) {
+export function Sidebar({ role, navItems, currentPath, onItemClick }: SidebarProps) {
   const appName = import.meta.env.VITE_APP_NAME || 'VLM Platform';
   const user = useAuthStore((state) => state.user);
 
   return (
     <div className="w-64 bg-slate-900 text-slate-300 flex flex-col h-screen flex-shrink-0">
       <div className="p-6">
-        <Link to="/" className="hover:opacity-80 transition-opacity">
+        <Link to="/" className="hover:opacity-80 transition-opacity" onClick={onItemClick}>
           <h1 className="text-xl font-bold text-white tracking-tight">{appName}</h1>
         </Link>
       </div>
@@ -48,6 +49,7 @@ export function Sidebar({ role, navItems, currentPath }: SidebarProps) {
               <div key={item.path} className="space-y-1">
                 <Link
                   to={item.path}
+                  onClick={onItemClick}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-all relative group",
                     isActive 
@@ -73,6 +75,7 @@ export function Sidebar({ role, navItems, currentPath }: SidebarProps) {
                       <Link
                         key={child.path}
                         to={child.path}
+                        onClick={onItemClick}
                         className={cn(
                           "block px-3 py-2 text-sm font-medium rounded-md transition-colors",
                           currentPath === child.path
