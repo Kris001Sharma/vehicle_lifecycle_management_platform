@@ -47,8 +47,8 @@ export async function getDashboardTrends(tenantId: string) {
     .eq('tenant_id', tenantId)
     .gte('sale_date', sixtyDaysAgo.toISOString());
 
-  const currentSales = salesData?.filter(v => new Date(v.sale_date) >= thirtyDaysAgo) || [];
-  const prevSales = salesData?.filter(v => new Date(v.sale_date) >= sixtyDaysAgo && new Date(v.sale_date) < thirtyDaysAgo) || [];
+  const currentSales = (salesData as any[])?.filter(v => new Date(v.sale_date) >= thirtyDaysAgo) || [];
+  const prevSales = (salesData as any[])?.filter(v => new Date(v.sale_date) >= sixtyDaysAgo && new Date(v.sale_date) < thirtyDaysAgo) || [];
 
   const revenueCurrent = currentSales.reduce((sum, v: any) => sum + (v.variant?.price || 0), 0);
   const revenuePrev = prevSales.reduce((sum, v: any) => sum + (v.variant?.price || 0), 0);

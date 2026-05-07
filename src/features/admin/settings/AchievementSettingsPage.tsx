@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useToast } from '@/hooks/useToast';
 import { Save, Trophy, Plus, Trash2, Award, Target, TrendingUp, Zap } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { cn } from '@/utils/cn';
 
@@ -23,14 +23,14 @@ export function AchievementSettingsPage() {
     queryKey: ['achievement_config', tenantId],
     queryFn: async () => {
       const [milestoneRes, configRes] = await Promise.all([
-        supabase.from('achievement_milestones').select('*').eq('tenant_id', tenantId).order('order_index', { ascending: true }),
-        supabase.from('tenant_achievement_config').select('*').eq('tenant_id', tenantId).single()
+        (supabase as any).from('achievement_milestones').select('*').eq('tenant_id', tenantId).order('order_index', { ascending: true }),
+        (supabase as any).from('tenant_achievement_config').select('*').eq('tenant_id', tenantId).single()
       ]);
 
       if (milestoneRes.data) setMilestones(milestoneRes.data);
       if (configRes.data) setQuote(configRes.data.quote || '');
       
-      return { milestones: milestoneRes.data, config: configRes.data };
+      return { milestones: milestoneRes.data as any[], config: configRes.data as any };
     },
     enabled: !!tenantId,
   });
@@ -41,7 +41,7 @@ export function AchievementSettingsPage() {
       // For simplicity in this demo environment, we'll delete and re-insert or update individually.
       // Better: Use a single transaction/RPC if possible.
       
-      const { error: configError } = await supabase
+      const { error: configError } = await (supabase as any)
         .from('tenant_achievement_config')
         .upsert({ tenant_id: tenantId, quote }, { onConflict: 'tenant_id' });
 
@@ -50,7 +50,7 @@ export function AchievementSettingsPage() {
       // Handle milestones: delete removed ones, upsert existing
       // For this implementation, we'll just upsert all current ones.
       if (milestones.length > 0) {
-        const { error: milestoneError } = await supabase
+        const { error: milestoneError } = await (supabase as any)
           .from('achievement_milestones')
           .upsert(milestones.map((m, i) => ({
             ...m,
@@ -83,7 +83,7 @@ export function AchievementSettingsPage() {
   const removeMilestone = async (index: number) => {
     const m = milestones[index];
     if (m.id) {
-       await supabase.from('achievement_milestones').delete().eq('id', m.id);
+       await (supabase as any).from('achievement_milestones').delete().eq('id', m.id);
     }
     setMilestones(milestones.filter((_, i) => i !== index));
   };

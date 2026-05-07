@@ -80,12 +80,12 @@ export function SalesDashboard() {
     queryKey: ['achievement_config', tenantId],
     queryFn: async () => {
       const [milestoneRes, configRes] = await Promise.all([
-        supabase.from('achievement_milestones').select('*').eq('tenant_id', tenantId).order('order_index', { ascending: true }),
-        supabase.from('tenant_achievement_config').select('*').eq('tenant_id', tenantId).single()
+        (supabase as any).from('achievement_milestones').select('*').eq('tenant_id', tenantId).order('order_index', { ascending: true }),
+        (supabase as any).from('tenant_achievement_config').select('*').eq('tenant_id', tenantId).single()
       ]);
       return { 
-        milestones: milestoneRes.data || [], 
-        config: configRes.data || { quote: "Consistency is the playground of the foundation of the champion." } 
+        milestones: (milestoneRes.data || []) as any[], 
+        config: (configRes.data || { quote: "Consistency is the playground of the foundation of the champion." }) as any 
       };
     },
     enabled: !!tenantId,
@@ -104,7 +104,7 @@ export function SalesDashboard() {
 
   const salesCount = trends?.salesCurrent || 0;
   const revenueCount = trends?.revenueCurrent || 0;
-  const milestones = achievementData?.milestones || [];
+  const milestones = (achievementData?.milestones || []) as any[];
   
   // Find the next milestone (first one not fully completed)
   const nextMilestone = milestones.find(m => salesCount < m.sales_target || revenueCount < m.revenue_target) || milestones[milestones.length - 1] || {
@@ -112,8 +112,6 @@ export function SalesDashboard() {
     sales_target: 10,
     revenue_target: 5000000
   };
-
-  const unlockedMilestones = milestones.filter(m => salesCount >= m.sales_target && revenueCount >= m.revenue_target);
   
   const renderKPI = (title: string, value: number | string, icon: React.ReactNode, trend?: number, link?: string, loading?: boolean) => {
     const isPositive = trend && trend > 0;
