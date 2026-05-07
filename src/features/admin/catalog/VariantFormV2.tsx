@@ -102,6 +102,7 @@ export function VariantFormV2() {
       name: '',
       sku: '',
       status: 'draft',
+      availability_status: 'ACTIVE',
       launched_at: '', // Launch year as string for input
       warranty_vehicle_yrs: 0,
       warranty_powertrain_yrs: 0,
@@ -121,6 +122,7 @@ export function VariantFormV2() {
       setValue('name', variantInit.name);
       setValue('sku', variantInit.sku || '');
       setValue('status', variantInit.status);
+      setValue('availability_status', variantInit.availability_status || 'ACTIVE');
       setValue('launched_at', variantInit.launched_at || '');
       setValue('warranty_vehicle_yrs', variantInit.warranty_vehicle_yrs || 0);
       setValue('warranty_powertrain_yrs', variantInit.warranty_powertrain_yrs || 0);
@@ -301,6 +303,25 @@ export function VariantFormV2() {
                     className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all capitalize ${watch('status') === status ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
                   >
                     {status}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Availability</label>
+              <div className="flex bg-slate-100 p-1 rounded-lg w-fit">
+                {[
+                  { id: 'ACTIVE', label: 'Active' },
+                  { id: 'PRE_ORDER_ONLY', label: 'Pre-order Only' },
+                  { id: 'DISCONTINUED', label: 'Discontinued' }
+                ].map(avail => (
+                  <button
+                    key={avail.id}
+                    type="button"
+                    onClick={() => setValue('availability_status', avail.id)}
+                    className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${watch('availability_status') === avail.id ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    {avail.label}
                   </button>
                 ))}
               </div>

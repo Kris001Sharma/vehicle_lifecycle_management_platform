@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Car, 
@@ -56,11 +56,13 @@ const MODEL_IMAGES: Record<string, string> = {
 
 export function NewSalePage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const preBooking = location.state?.preBooking;
   const { user, tenantId } = useAuthStore(s => ({ user: s.user!, tenantId: s.user!.tenantId! }));
   const { showToast } = useToast();
   const queryClient = useQueryClient();
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(preBooking ? 2 : 1);
   const [selectionStep, setSelectionStep] = useState(1); // 1: Category, 2: Manufacturer, 3: Model, 4: Variant
   
   const [recordedSale, setRecordedSale] = useState<any>(null);
@@ -69,8 +71,18 @@ export function NewSalePage() {
   const [selectedCategory, setSelectedCategory] = useState<any>(null);
   const [selectedManufacturer, setSelectedManufacturer] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<any>(null);
-  const [selectedVariant, setSelectedVariant] = useState<any>(null);
+  const [selectedVariant, setSelectedVariant] = useState<any>(preBooking?.variant || null);
   const [selectedColor, setSelectedColor] = useState<any>(null);
+
+  useEffect(() => {
+    if (preBooking) {
+      if (preBooking.customer) setSelectedCustomer(preBooking.customer);
+      if (preBooking.colour_preference && preBooking.variant?.specs?.colour_options) {
+        const color = preBooking.variant.specs.colour_options.find((c: any) => c.name === preBooking.colour_preference);
+        if (color) setSelectedColor(color);
+      }
+    }
+  }, [preBooking]);
 
   // Step 2: Vehicle
   const [vehicleNumber, setVehicleNumber] = useState('');
@@ -83,7 +95,7 @@ export function NewSalePage() {
   // Step 3: Customer
   const [customerMode, setCustomerMode] = useState<'select' | 'new'>('select');
   const [customerSearch, setCustomerSearch] = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(preBooking?.customer || null);
   const debouncedCustomerSearch = useDebounce(customerSearch, 300);
   
   // New Customer Form
@@ -98,8 +110,8 @@ export function NewSalePage() {
   // Form dirty state for navigation protection
   const isActuallyDirty = useMemo(() => {
     if (recordedSale) return false;
-    return !!selectedCategory || !!vehicleNumber || !!selectedCustomer || !!newCustName || !!selectedModel || !!selectedVariant;
-  }, [recordedSale, selectedCategory, vehicleNumber, selectedCustomer, newCustName, selectedModel, selectedVariant]);
+    return !!selectedCategory || !!vehicleNumber || (selectedCustomer && !preBooking) || !!newCustName || !!selectedModel || (selectedVariant && !preBooking);
+  }, [recordedSale, selectedCategory, vehicleNumber, selectedCustomer, newCustName, selectedModel, selectedVariant, preBooking]);
 
   const { 
     shouldShowDialog, 
@@ -205,10 +217,11 @@ export function NewSalePage() {
         variant_id: selectedVariant.id,
         customer_id: selectedCustomer.id,
         status: 'active'
-      }, selectedOptionalFeatures, tenantId, user.id);
+      }, selectedOptionalFeatures, tenantId, user.id, preBooking?.id);
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+      if (preBooking) queryClient.invalidateQueries({ queryKey: ['pre_bookings_all'] });
       
       const vehicle = data.vehicle || { id: data.vehicleId };
       if (!vehicle.id && data.id) vehicle.id = data.id; // defensive
@@ -218,7 +231,7 @@ export function NewSalePage() {
         tracking: `VLM-${Math.random().toString(36).substring(2, 9).toUpperCase()}` 
       });
       celebrate();
-      showToast('Sale recorded successfully', 'success');
+      showToast(preBooking ? 'Pre-booking successfully converted to Sale!' : 'Sale recorded successfully', 'success');
     },
     onError: (err: any) => showToast(err.message, 'error')
   });

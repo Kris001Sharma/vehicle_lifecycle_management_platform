@@ -1,12 +1,13 @@
 import { supabase } from '../supabase/client';
 
-export async function getVariantsForSale(tenantId: string) {
+export async function getVariantsForSale(tenantId: string, options?: { excludePreOrderOnly?: boolean }) {
   const { data, error } = await supabase
     .from('vehicle_variants')
     .select(`
       id,
       name,
       status,
+      availability_status,
       price,
       specs,
       powertrain:powertrain_types (display_label, slug),
@@ -29,7 +30,13 @@ export async function getVariantsForSale(tenantId: string) {
   }
 
   // Filter out any variants that don't have a valid model/category or inactive models
-  const validData = (data || []).filter((v: any) => v.model && v.model.is_active !== false);
+  // Also respect availability_status if it exists
+  const validData = (data || []).filter((v: any) => {
+    if (!v.model || v.model.is_active === false) return false;
+    if (v.availability_status === 'DISCONTINUED') return false;
+    if (options?.excludePreOrderOnly && v.availability_status === 'PRE_ORDER_ONLY') return false;
+    return true;
+  });
 
   // Group by category then model
   const categorized: Record<string, any> = {};
@@ -79,7 +86,7 @@ export async function getVariantDetails(variantId: string, tenantId: string) {
   const { data, error } = await supabase
     .from('vehicle_variants')
     .select(`
-      *,
+      id, name, status, availability_status, price, specs, warranty_vehicle_yrs,
       powertrain:powertrain_types (display_label, slug),
       model:vehicle_models (
         manufacturer,
@@ -121,7 +128,8 @@ export async function createVehicleSale(
   saleData: any,
   selectedOptionalFeatureIds: string[],
   tenantId: string,
-  userId: string
+  userId: string,
+  preBookingId?: string
 ) {
   // 1. Re-check vehicle_number uniqueness server-side
   const isUnique = await checkVehicleNumberUnique(saleData.vehicle_number, tenantId);
@@ -141,20 +149,60 @@ export async function createVehicleSale(
   }
 
   try {
-    // 3. Fetch variant_default_features for the variant
+    // 3. Update Pre-booking if converting
+    if (preBookingId) {
+      // First get the pre_booking to check if an inventory unit is attached
+       const { data: pbData } = await (supabase as any)
+         .from('pre_bookings')
+         .select('inventory_unit_id')
+         .eq('id', preBookingId)
+         .single();
+         
+      await (supabase as any)
+        .from('pre_bookings')
+        .update({ 
+          status: 'delivered', 
+          vehicle_id: vehicle.id, 
+          actual_delivery_date: new Date().toISOString().split('T')[0] 
+        })
+        .eq('id', preBookingId);
+        
+      if (pbData?.inventory_unit_id) {
+         await (supabase as any)
+           .from('inventory_units')
+           .update({ status: 'sold' })
+           .eq('id', pbData.inventory_unit_id);
+      }
+    }
+
+    // Try to find a matching inventory unit by vehicle number and link it
+    const { data: invData } = await (supabase as any)
+      .from('inventory_units')
+      .select('id')
+      .eq('vehicle_number', saleData.vehicle_number)
+      .maybeSingle();
+
+    if (invData) {
+      await (supabase as any)
+        .from('inventory_units')
+        .update({ status: 'sold' })
+        .eq('id', invData.id);
+    }
+
+    // 4. Fetch variant_default_features for the variant
     const { data: features } = await (supabase as any)
       .from('variant_default_features')
       .select('feature_id, is_standard')
       .eq('variant_id', saleData.variant_id);
 
     if (features && features.length > 0) {
-      // 4. Separate into standard and optional
+      // 5. Separate into standard and optional
       const featuresToInsert = features.filter((f: any) => 
         f.is_standard || selectedOptionalFeatureIds.includes(f.feature_id)
       );
 
       if (featuresToInsert.length > 0) {
-        // 5. Insert vehicle_features rows
+        // 6. Insert vehicle_features rows
         const insertData = featuresToInsert.map((f: any) => ({
           vehicle_id: vehicle.id,
           feature_id: f.feature_id,
@@ -166,16 +214,15 @@ export async function createVehicleSale(
       }
     }
 
-    // 6. Return vehicle with basic info (it will be fully fetched in page)
+    // 7. Return vehicle with basic info
     return { vehicle };
   } catch (error) {
     // On any step failure after vehicle insert: do not attempt rollback
-    // log to error_logs with entity_id and return PARTIAL_SUCCESS
-    console.error("Failed to insert features:", error);
+    console.error("Failed to insert features or update pre_booking:", error);
     await (supabase as any).from('error_logs').insert({
       tenant_id: tenantId,
       user_id: userId,
-      error_type: 'PARTIAL_SUCCESS_VEHICLE_FEATURES',
+      error_type: 'PARTIAL_SUCCESS_VEHICLE_FEATURES_OR_PREBOOKING',
       error_message: String(error),
       entity_type: 'vehicle',
       entity_id: vehicle?.id

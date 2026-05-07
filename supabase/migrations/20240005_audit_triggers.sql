@@ -83,3 +83,15 @@ DROP TRIGGER IF EXISTS audit_vehicle_ownership_history ON public.vehicle_ownersh
 CREATE TRIGGER audit_vehicle_ownership_history
   AFTER INSERT OR UPDATE OR DELETE ON public.vehicle_ownership_history
   FOR EACH ROW EXECUTE FUNCTION public.handle_audit_log();
+
+-- inventory_units
+DROP TRIGGER IF EXISTS audit_inventory_units ON public.inventory_units;
+CREATE TRIGGER audit_inventory_units
+  AFTER INSERT OR UPDATE OR DELETE ON public.inventory_units
+  FOR EACH ROW EXECUTE FUNCTION public.handle_audit_log();
+
+-- pre_bookings
+DROP TRIGGER IF EXISTS audit_pre_bookings ON public.pre_bookings;
+CREATE TRIGGER audit_pre_bookings
+  AFTER INSERT OR UPDATE OR DELETE ON public.pre_bookings
+  FOR EACH ROW EXECUTE FUNCTION public.handle_audit_log();

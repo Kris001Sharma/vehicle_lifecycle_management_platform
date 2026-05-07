@@ -14,20 +14,7 @@ RETURNS UUID AS $$
 $$ LANGUAGE SQL STABLE;
 
 -- Enable RLS on all tables
-ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vehicle_types ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vehicle_models ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vehicle_variants ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.features ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.variant_default_features ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vehicles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vehicle_features ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.vehicle_ownership_history ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.service_records ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.service_parts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.attachments ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+-- (Enabled during table creation in core schema)
 
 
 -- 1. tenants
@@ -291,3 +278,39 @@ DROP POLICY IF EXISTS "users_can_read_all_in_tenant" ON public.user_profiles;
 CREATE POLICY "users_can_read_all_in_tenant" ON public.user_profiles
   FOR SELECT TO authenticated
   USING (tenant_id = public.get_user_tenant_id());
+
+-- 16. Catalog & Config
+DROP POLICY IF EXISTS "authenticated_can_read_powertrain_types" ON public.powertrain_types;
+CREATE POLICY "authenticated_can_read_powertrain_types" ON public.powertrain_types FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "authenticated_can_read_categories" ON public.vehicle_categories;
+CREATE POLICY "authenticated_can_read_categories" ON public.vehicle_categories FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "admin_can_manage_catalog_config" ON public.tenant_catalog_config;
+CREATE POLICY "admin_can_manage_catalog_config" ON public.tenant_catalog_config FOR ALL TO authenticated
+USING (tenant_id = public.get_user_tenant_id() AND public.get_user_role() = 'admin')
+WITH CHECK (tenant_id = public.get_user_tenant_id() AND public.get_user_role() = 'admin');
+
+DROP POLICY IF EXISTS "all_roles_can_read_catalog_config" ON public.tenant_catalog_config;
+CREATE POLICY "all_roles_can_read_catalog_config" ON public.tenant_catalog_config FOR SELECT TO authenticated
+USING (tenant_id = public.get_user_tenant_id());
+
+-- 17. Sales & Inventory
+DROP POLICY IF EXISTS "admin_sales_can_manage_inventory" ON public.inventory_units;
+CREATE POLICY "admin_sales_can_manage_inventory" ON public.inventory_units FOR ALL TO authenticated
+USING (tenant_id = public.get_user_tenant_id() AND public.get_user_role() IN ('admin','sales'))
+WITH CHECK (tenant_id = public.get_user_tenant_id() AND public.get_user_role() IN ('admin','sales'));
+
+DROP POLICY IF EXISTS "admin_sales_can_manage_prebookings" ON public.pre_bookings;
+CREATE POLICY "admin_sales_can_manage_prebookings" ON public.pre_bookings FOR ALL TO authenticated
+USING (tenant_id = public.get_user_tenant_id() AND public.get_user_role() IN ('admin','sales'))
+WITH CHECK (tenant_id = public.get_user_tenant_id() AND public.get_user_role() IN ('admin','sales'));
+
+DROP POLICY IF EXISTS "service_can_read_prebookings" ON public.pre_bookings;
+CREATE POLICY "service_can_read_prebookings" ON public.pre_bookings FOR SELECT TO authenticated
+USING (tenant_id = public.get_user_tenant_id());
+
+DROP POLICY IF EXISTS "admin_sales_can_manage_comms" ON public.customer_communications;
+CREATE POLICY "admin_sales_can_manage_comms" ON public.customer_communications FOR ALL TO authenticated
+USING (tenant_id = public.get_user_tenant_id() AND public.get_user_role() IN ('admin','sales'))
+WITH CHECK (tenant_id = public.get_user_tenant_id() AND public.get_user_role() IN ('admin','sales'));

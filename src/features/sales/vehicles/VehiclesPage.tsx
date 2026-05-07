@@ -75,45 +75,51 @@ export function VehiclesPage() {
         </Button>
       }
     >
-      <div className="mb-4 relative">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-slate-400" />
+      <div className="mb-6 space-y-6">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <Search className="h-5 w-5 text-slate-400" />
+            </div>
+            <input
+              type="text"
+              className="block w-full pl-10 pr-3 py-2 border border-slate-200 rounded-md leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              placeholder="Search vehicles..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+          
+          <select
+            className="bg-white border border-slate-200 rounded-md text-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-48 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20fill%3D%22none%22%20viewBox%3D%220%200%2020%2020%22%3E%3Cpath%20stroke%3D%22%236B7280%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20stroke-width%3D%221.5%22%20d%3D%22m6%208%204%204%204-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.25rem_1.25rem] bg-[right_0.5rem_center] bg-no-repeat"
+            value={categoryFilter}
+            onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
+          >
+            <option value="All">All categories</option>
+            {categories?.map((c: any) => (
+              <option key={c.id} value={c.name}>{c.name}</option>
+            ))}
+          </select>
         </div>
-        <input
-          type="text"
-          className="block w-full pl-10 pr-3 py-2 border border-slate-200 rounded-md leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          placeholder="Search by vehicle number, plate, chassis or customer name"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
-      </div>
 
-      <div className="flex flex-wrap items-center gap-4 mb-6">
-        <div className="flex bg-slate-100 p-1 rounded-md">
+        <div className="flex border-b border-slate-200 min-w-0">
           {['All', 'Active', 'Transferred', 'Archived'].map(s => (
             <button
               key={s}
               onClick={() => { setStatusFilter(s); setPage(1); }}
-              className={`px-3 py-1.5 text-xs font-medium rounded transition-colors ${statusFilter === s ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'}`}
+              className={`flex-1 whitespace-nowrap px-2 sm:px-4 py-2 border-b-2 font-semibold text-[10px] sm:text-xs uppercase tracking-wider transition-colors text-center ${
+                statusFilter === s
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
             >
               {s}
             </button>
           ))}
         </div>
-        
-        <select
-          className="bg-white border border-slate-200 rounded-md text-sm py-1.5 px-3 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          value={categoryFilter}
-          onChange={e => { setCategoryFilter(e.target.value); setPage(1); }}
-        >
-          <option value="All">All categories</option>
-          {categories?.map((c: any) => (
-            <option key={c.id} value={c.name}>{c.name}</option>
-          ))}
-        </select>
       </div>
 
       <div className="sm:hidden space-y-3 pb-6">

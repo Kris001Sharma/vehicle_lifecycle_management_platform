@@ -17,12 +17,13 @@ export function CustomersPage() {
   
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [segment, setSegment] = useState<'all' | 'leads' | 'active' | 'owners' | 'contacts'>('all');
   const debouncedSearch = useDebounce(search, 300);
   const pageSize = 20;
 
   const { data, isLoading } = useQuery({
-    queryKey: ['customers', tenantId, debouncedSearch, page],
-    queryFn: () => searchCustomers(debouncedSearch, tenantId!, page, pageSize),
+    queryKey: ['customers', tenantId, debouncedSearch, page, segment],
+    queryFn: () => searchCustomers(debouncedSearch, tenantId!, page, pageSize, segment),
     enabled: !!tenantId,
   });
 
@@ -36,6 +37,33 @@ export function CustomersPage() {
     }
   };
 
+  const tabs = [
+    { id: 'all', short: 'All', label: 'All Customers' },
+    { id: 'leads', short: 'New Leads', label: 'New Leads' },
+    { id: 'active', short: 'Active', label: 'Active Clients' },
+    { id: 'owners', short: 'Owners', label: 'Vehicle Owners' },
+    { id: 'contacts', short: 'Contacts', label: 'Contacts Only' },
+  ];
+
+  const getSegmentBadge = (c: any) => {
+    if ((c.vehicles?.length || 0) > 0) {
+      return <Badge variant="success" className="text-[9px] px-1.5 py-0 border-0 font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700">Owner</Badge>;
+    }
+    const hasActivePb = c.pre_bookings?.some((pb: any) => ['confirmed', 'ordered', 'in_transit'].includes(pb.status));
+    if (hasActivePb) {
+      return <Badge variant="info" className="text-[9px] px-1.5 py-0 border-0 font-bold uppercase tracking-wider bg-blue-50 text-blue-700">Active</Badge>;
+    }
+    const hasLeadPb = c.pre_bookings?.some((pb: any) => pb.status === 'enquiry');
+    if (hasLeadPb) {
+      return <Badge variant="warning" className="text-[9px] px-1.5 py-0 border-0 font-bold uppercase tracking-wider bg-amber-50 text-amber-700">Lead</Badge>;
+    }
+    return <Badge variant="neutral" className="text-[9px] px-1.5 py-0 border-0 font-bold uppercase tracking-wider bg-slate-50 text-slate-500">Contact</Badge>;
+  };
+
+  const filteredRows = segment === 'contacts' 
+    ? data?.rows.filter((c: any) => (c.vehicles?.length === 0) && (c.pre_bookings?.length === 0))
+    : data?.rows;
+
   return (
     <PageWrapper
       title="Customers"
@@ -45,29 +73,48 @@ export function CustomersPage() {
         </Button>
       }
     >
-      <div className="mb-6 relative">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-slate-400" />
+      <div className="mb-6 space-y-6">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-slate-400" />
+          </div>
+          <input
+            type="text"
+            className="block w-full pl-10 pr-3 py-2 border border-slate-200 rounded-md leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            placeholder="Search by name, phone or email"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+          />
         </div>
-        <input
-          type="text"
-          className="block w-full pl-10 pr-3 py-2 border border-slate-200 rounded-md leading-5 bg-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-          placeholder="Search by name, phone or email"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-        />
+
+        <div className="flex border-b border-slate-200 min-w-0">
+          {tabs.map(t => (
+            <button
+              key={t.id}
+              onClick={() => { setSegment(t.id as any); setPage(1); }}
+              className={`flex-1 whitespace-nowrap px-2 sm:px-4 py-2 border-b-2 font-semibold text-[10px] sm:text-xs uppercase tracking-wider transition-colors text-center ${
+                segment === t.id
+                  ? 'border-indigo-600 text-indigo-600'
+                  : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <span className="hidden sm:inline">{t.label}</span>
+              <span className="sm:hidden">{t.short}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="sm:hidden space-y-3">
         {isLoading ? (
           [...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)
-        ) : data?.rows.length === 0 ? (
+        ) : filteredRows?.length === 0 ? (
           <div className="py-8 text-center text-slate-500 text-sm">No customers found.</div>
         ) : (
-          data?.rows.map((customer: any) => (
+          filteredRows?.map((customer: any) => (
             <Link 
               key={customer.id} 
               to={`/sales/customers/${customer.id}`}
@@ -75,7 +122,10 @@ export function CustomersPage() {
             >
               <div className="flex justify-between items-start">
                 <div>
-                  <div className="font-bold text-slate-900 tracking-tight">{customer.name}</div>
+                  <div className="font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                    {customer.name}
+                    {getSegmentBadge(customer)}
+                  </div>
                   <div className="text-xs text-slate-500 font-medium mt-0.5">{customer.phone}</div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -118,7 +168,7 @@ export function CustomersPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-right"><Skeleton className="h-4 w-12 ml-auto" /></td>
                   </tr>
                 ))
-              ) : data?.rows.length === 0 ? (
+              ) : filteredRows?.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                     {debouncedSearch ? "No customers match your search." : "No customers yet. Add your first customer."}
@@ -130,10 +180,13 @@ export function CustomersPage() {
                   </td>
                 </tr>
               ) : (
-                data?.rows.map((customer: any) => (
-                  <tr key={customer.id} className="hover:bg-slate-50/50 transition-all border-b border-slate-50 last:border-0">
+                filteredRows?.map((customer: any) => (
+                  <tr key={customer.id} className="hover:bg-slate-50/50 transition-all border-b border-slate-50 last:border-0 growable-row">
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-slate-900 tracking-tight">{customer.name}</div>
+                      <div className="text-sm font-semibold text-slate-900 tracking-tight flex items-center gap-2">
+                        {customer.name}
+                        {getSegmentBadge(customer)}
+                      </div>
                       {customer.email && <div className="text-[11px] font-medium text-slate-500">{customer.email}</div>}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">

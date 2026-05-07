@@ -107,19 +107,24 @@ export function CustomerDetailPage() {
       title={customer.name}
       backLink={{ label: 'Customers', path: '/sales/customers' }}
     >
-      <div className="mb-6 border-b border-slate-200">
-        <nav className="-mb-px flex space-x-6">
-          {(['overview', 'pre-bookings', 'communications'] as const).map(tab => (
+      <div className="mb-8 border-b border-slate-200 min-w-0">
+        <nav className="flex">
+          {[
+            { id: 'overview', label: 'Overview', short: 'Info' },
+            { id: 'pre-bookings', label: 'Pre Bookings', short: 'Bookings' },
+            { id: 'communications', label: 'Communications', short: 'Timeline' }
+          ].map(tab => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === tab
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex-1 whitespace-nowrap py-3 border-b-2 font-semibold text-[10px] sm:text-xs uppercase tracking-wider transition-colors text-center ${
+                activeTab === tab.id
                   ? 'border-indigo-600 text-indigo-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  : 'border-transparent text-slate-400 hover:text-slate-600'
               }`}
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1).replace('-', ' ')}
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.short}</span>
             </button>
           ))}
         </nav>

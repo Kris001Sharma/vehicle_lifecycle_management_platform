@@ -45,8 +45,8 @@ export function InventoryUnitFormModal({ isOpen, onClose, tenantId, onSuccess }:
   };
 
   const { data: variantsData } = useQuery({
-    queryKey: ['variants_for_sale', tenantId],
-    queryFn: () => getVariantsForSale(tenantId!),
+    queryKey: ['variants_for_sale', tenantId, 'inventory'],
+    queryFn: () => getVariantsForSale(tenantId!, { excludePreOrderOnly: true }),
     enabled: !!tenantId && isOpen
   });
 

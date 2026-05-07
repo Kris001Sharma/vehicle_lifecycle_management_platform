@@ -11,6 +11,7 @@ import { CatalogPage } from './catalog/CatalogPage';
 import { VariantFormV2 } from './catalog/VariantFormV2';
 import { ModelFormPage } from './catalog/ModelFormPage';
 import { CatalogSettingsPage } from './settings/CatalogSettingsPage';
+import { AchievementSettingsPage } from './settings/AchievementSettingsPage';
 
 const ADMIN_NAV = [
   { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
@@ -30,6 +31,7 @@ const ADMIN_NAV = [
     icon: Settings,
     children: [
         { label: 'Catalog Settings', path: '/admin/settings/catalog' },
+        { label: 'Achievement Settings', path: '/admin/settings/achievements' },
     ]
   },
 ];
@@ -96,6 +98,7 @@ export default function AdminDashboard() {
           <Route path="/catalog/variants/new" element={<VariantFormV2 />} />
           <Route path="/catalog/variants/:variantId/edit" element={<VariantFormV2 />} />
           <Route path="/settings/catalog" element={<CatalogSettingsPage />} />
+          <Route path="/settings/achievements" element={<AchievementSettingsPage />} />
         </Routes>
       </div>
     </div>

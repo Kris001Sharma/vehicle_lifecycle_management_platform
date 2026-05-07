@@ -10,6 +10,8 @@ import { useAuthStore } from '@/features/auth/store/authStore';
 import { getPreBookings } from '@/lib/db/preBookings';
 import { PreBookingFormModal } from './PreBookingFormModal';
 import { PreBookingStatusModal } from './PreBookingStatusModal';
+import { MessageSquare, CheckCircle2, FileText, Truck } from 'lucide-react';
+import { cn } from '@/utils/cn';
 
 export function PreBookingsPage() {
   const { tenantId } = useAuthStore(s => s.user!) || {};
@@ -60,32 +62,80 @@ export function PreBookingsPage() {
   return (
     <PageWrapper 
       title="Pre-bookings" 
-      actions={<Button onClick={() => setIsModalOpen(true)}>+ New booking</Button>}
+      actions={
+        <Button 
+          onClick={() => setIsModalOpen(true)}
+          className="rounded-full px-6 font-bold shadow-sm bg-indigo-600 hover:bg-indigo-700 text-white"
+        >
+          + New booking
+        </Button>
+      }
     >
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'Enquiry', value: counts?.enquiry },
-          { label: 'Confirmed', value: counts?.confirmed },
-          { label: 'Ordered', value: counts?.ordered },
-          { label: 'In transit', value: counts?.in_transit, alert: hasOverdueTransit }
+          { label: 'Enquiry', value: counts?.enquiry, icon: <MessageSquare className="w-4 h-4" /> },
+          { label: 'Confirmed', value: counts?.confirmed, icon: <CheckCircle2 className="w-4 h-4" /> },
+          { label: 'Ordered', value: counts?.ordered, icon: <FileText className="w-4 h-4" /> },
+          { label: 'In transit', value: counts?.in_transit, icon: <Truck className="w-4 h-4" />, alert: hasOverdueTransit }
         ].map(s => (
-          <Card key={s.label} className={`p-3 text-center border-slate-200 shadow-sm ${s.alert ? 'border-amber-400 bg-amber-50/50' : ''}`}>
-             <div className="text-xl font-bold text-slate-900 mb-0.5 tracking-tight">{s.value || 0}</div>
-             <div className={`text-[10px] uppercase font-semibold tracking-widest ${s.alert ? 'text-amber-700' : 'text-slate-500'}`}>{s.label}</div>
+          <Card 
+            key={s.label} 
+            className={cn(
+              "p-5 border shadow-sm relative overflow-hidden group transition-all flex flex-col justify-between",
+              s.alert ? "border-amber-200 bg-amber-50/30 hover:border-amber-300" : "border-slate-100 hover:border-indigo-100 hover:shadow-md"
+            )}
+          >
+            <div className={cn(
+              "absolute -right-3 -top-3 w-12 h-12 rounded-full transition-colors z-0",
+              s.alert ? "bg-amber-100/50 group-hover:bg-amber-100" : "bg-slate-50 group-hover:bg-indigo-50"
+            )} />
+            <div className={cn(
+              "absolute right-3 top-3 transition-colors z-10",
+              s.alert ? "text-amber-400 group-hover:text-amber-500" : "text-slate-300 group-hover:text-indigo-200"
+            )}>
+              {s.icon}
+            </div>
+            
+            <div className="relative z-10">
+              <h3 className={cn(
+                "text-[10px] font-bold uppercase tracking-widest mb-2",
+                s.alert ? "text-amber-700" : "text-slate-500"
+              )}>
+                {s.label}
+              </h3>
+              <div className="text-3xl font-bold text-slate-900 tracking-tight">
+                {isLoading ? <Skeleton className="h-9 w-12" /> : (s.value || 0)}
+              </div>
+            </div>
           </Card>
         ))}
       </div>
 
-      <div className="flex bg-slate-100 p-1 rounded-md mb-6 w-fit overflow-x-auto">
-        {['All', 'Enquiry', 'Confirmed', 'Ordered', 'In transit', 'Delivered', 'Cancelled'].map(f => (
-          <button 
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`whitespace-nowrap px-3 py-1.5 text-xs font-medium rounded transition-colors ${filter === f ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'}`}
-          >
-            {f}
-          </button>
-        ))}
+      <div className="mb-6 space-y-4">
+        <div className="flex border-b border-slate-200 overflow-x-auto min-w-0 hide-scrollbar scroll-smooth">
+          {[
+            { id: 'All', short: 'All' },
+            { id: 'Enquiry', short: 'Enq' },
+            { id: 'Confirmed', short: 'Conf' },
+            { id: 'Ordered', short: 'Ord' },
+            { id: 'In transit', short: 'Transit' },
+            { id: 'Delivered', short: 'Del' },
+            { id: 'Cancelled', short: 'Can' }
+          ].map(f => (
+            <button 
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={`flex-none sm:flex-1 whitespace-nowrap px-4 sm:px-2 py-2 border-b-2 font-semibold text-[10px] sm:text-xs uppercase tracking-wider transition-colors text-center ${
+                filter === f.id 
+                  ? 'border-indigo-600 text-indigo-600' 
+                  : 'border-transparent text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              <span className="hidden sm:inline">{f.id}</span>
+              <span className="sm:hidden">{f.short}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="sm:hidden space-y-3 pb-6">
@@ -128,19 +178,28 @@ export function PreBookingsPage() {
                     Exp: {pb.expected_delivery_date ? new Date(pb.expected_delivery_date).toLocaleDateString() : '-'}
                   </div>
                 </div>
-                <div className="mt-3 flex justify-end gap-3">
-                  {pb.status !== 'cancelled' && pb.status !== 'delivered' && (
-                    <button 
-                      onClick={() => setStatusModalBooking({ ...pb, action: 'update' })}
-                      className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest"
-                    >
-                      Status
-                    </button>
-                  )}
-                  <Link to={`/sales/customers/${pb.customer_id}`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                    Customer
-                  </Link>
-                </div>
+                  <div className="mt-3 flex justify-end gap-3 items-center">
+                    {pb.status === 'ordered' && (
+                      <Link 
+                        to={`/sales/new`} 
+                        state={{ preBooking: pb }}
+                        className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest px-2 py-1 bg-emerald-50 rounded"
+                      >
+                        Convert to Sale
+                      </Link>
+                    )}
+                    {pb.status !== 'cancelled' && pb.status !== 'delivered' && (
+                      <button 
+                        onClick={() => setStatusModalBooking({ ...pb, action: 'update' })}
+                        className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest"
+                      >
+                        Status
+                      </button>
+                    )}
+                    <Link to={`/sales/customers/${pb.customer_id}`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      Customer
+                    </Link>
+                  </div>
               </div>
             );
           })
@@ -211,13 +270,22 @@ export function PreBookingsPage() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                         <div className="flex gap-3 justify-end items-center">
+                          {pb.status === 'ordered' && (
+                            <Link 
+                              to={`/sales/new`} 
+                              state={{ preBooking: pb }}
+                              className="text-emerald-600 hover:text-emerald-800 font-semibold text-xs uppercase tracking-wider px-2 py-1 bg-emerald-50 rounded"
+                            >
+                              Convert to Sale
+                            </Link>
+                          )}
                           <Link to={`/sales/customers/${pb.customer_id}`} className="text-indigo-600 hover:text-indigo-800 font-semibold text-xs uppercase tracking-wider">
                             View
                           </Link>
                           {pb.status !== 'cancelled' && pb.status !== 'delivered' && (
                             <button 
                               onClick={() => setStatusModalBooking({ ...pb, action: 'update' })}
-                              className="text-slate-400 hover:text-slate-900 transition-colors"
+                              className="text-slate-400 hover:text-slate-900 transition-colors font-semibold text-xs uppercase tracking-wider"
                             >
                               Status
                             </button>
