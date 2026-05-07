@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -10,10 +10,11 @@ import { useAuthStore } from '@/features/auth/store/authStore';
 import { getPreBookings } from '@/lib/db/preBookings';
 import { PreBookingFormModal } from './PreBookingFormModal';
 import { PreBookingStatusModal } from './PreBookingStatusModal';
-import { MessageSquare, CheckCircle2, FileText, Truck } from 'lucide-react';
+import { MessageSquare, CheckCircle2, FileText, Truck, ArrowRight, Settings2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 export function PreBookingsPage() {
+  const navigate = useNavigate();
   const { tenantId } = useAuthStore(s => s.user!) || {};
   const queryClient = useQueryClient();
 
@@ -149,11 +150,12 @@ export function PreBookingsPage() {
             return (
               <div 
                 key={pb.id} 
-                className="block bg-white p-4 rounded-xl border border-slate-200 shadow-sm active:bg-slate-50 transition-colors"
+                onClick={() => navigate(`/sales/customers/${pb.customer_id}?tab=pre-bookings`)}
+                className="block bg-white p-4 rounded-xl border border-slate-200 shadow-sm active:bg-slate-50 transition-colors cursor-pointer group"
               >
                 <div className="flex justify-between items-start mb-2">
                   <div>
-                    <div className="text-sm font-bold text-slate-900 tracking-tight">{pb.customer?.name}</div>
+                    <div className="text-sm font-semibold text-slate-900 tracking-tight">{pb.customer?.name}</div>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <div className="text-xs font-semibold text-slate-500">{pb.variant?.name}</div>
                       {pb.colour_preference && (() => {
@@ -168,7 +170,7 @@ export function PreBookingsPage() {
                       })()}
                     </div>
                   </div>
-                  <Badge variant={getStatusColor(pb.status) as any} className="capitalize px-1.5 py-0 border-0 font-bold text-[9px] uppercase tracking-wider">
+                  <Badge variant={getStatusColor(pb.status) as any} className="capitalize px-1.5 py-0 border-0 font-semibold text-[10px] uppercase tracking-wider">
                     {pb.status.replace('_', ' ')}
                   </Badge>
                 </div>
@@ -178,27 +180,32 @@ export function PreBookingsPage() {
                     Exp: {pb.expected_delivery_date ? new Date(pb.expected_delivery_date).toLocaleDateString() : '-'}
                   </div>
                 </div>
-                  <div className="mt-3 flex justify-end gap-3 items-center">
+                  <div className="mt-3 flex justify-end gap-2 items-center" onClick={(e) => e.stopPropagation()}>
                     {pb.status === 'ordered' && (
                       <Link 
-                        to={`/sales/new`} 
+                        to={`/sales/vehicles/new`} 
                         state={{ preBooking: pb }}
-                        className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest px-2 py-1 bg-emerald-50 rounded"
                       >
-                        Convert to Sale
+                        <Button 
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100"
+                        >
+                          Convert to Sale
+                        </Button>
                       </Link>
                     )}
                     {pb.status !== 'cancelled' && pb.status !== 'delivered' && (
-                      <button 
+                      <Button 
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 px-3 text-[9px] font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-50"
                         onClick={() => setStatusModalBooking({ ...pb, action: 'update' })}
-                        className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest"
                       >
-                        Status
-                      </button>
+                       <Settings2 className="w-3 h-3 mr-1" />
+                        Change Status
+                      </Button>
                     )}
-                    <Link to={`/sales/customers/${pb.customer_id}`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      Customer
-                    </Link>
                   </div>
               </div>
             );
@@ -216,10 +223,10 @@ export function PreBookingsPage() {
                 <th scope="col" className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Status</th>
                 <th scope="col" className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Booked</th>
                 <th scope="col" className="px-4 py-3 text-left text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Expected</th>
-                <th scope="col" className="relative px-4 py-3"><span className="sr-only">Actions</span></th>
+                <th scope="col" className="relative px-4 py-3 text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider pr-8">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-slate-100">
+            <tbody className="bg-white divide-y divide-slate-100 font-sans">
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i}>
@@ -239,8 +246,16 @@ export function PreBookingsPage() {
                 bookings.map((pb: any) => {
                   const isPastExpected = pb.expected_delivery_date && new Date(pb.expected_delivery_date) < new Date() && pb.status !== 'delivered' && pb.status !== 'cancelled';
                   return (
-                    <tr key={pb.id} className="hover:bg-slate-50/50 transition-all border-b border-slate-50 last:border-0 growable-row">
-                      <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-slate-900 tracking-tight">{pb.customer?.name}</td>
+                    <tr 
+                      key={pb.id} 
+                      onClick={() => navigate(`/sales/customers/${pb.customer_id}?tab=pre-bookings`)}
+                      className="group hover:bg-slate-50/50 transition-all border-b border-slate-50 last:border-0 cursor-pointer"
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-sm font-semibold text-slate-900 tracking-tight">
+                          {pb.customer?.name}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
                           <div className="text-sm font-semibold text-slate-900">{pb.variant?.name}</div>
@@ -248,7 +263,7 @@ export function PreBookingsPage() {
                             const opt = pb.variant?.specs?.colour_options?.find((o: any) => o.name === pb.colour_preference);
                             return opt ? (
                               <div 
-                                className="w-3 h-3 rounded-full border border-slate-200" 
+                                className="w-2.5 h-2.5 rounded-full border border-slate-200 shadow-sm" 
                                 style={{ backgroundColor: opt.hex }}
                                 title={opt.name}
                               />
@@ -264,32 +279,38 @@ export function PreBookingsPage() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-[12px] font-medium text-slate-500">{new Date(pb.booking_date).toLocaleDateString()}</td>
                       <td className="px-4 py-3 whitespace-nowrap text-[12px] font-medium">
-                        <span className={isPastExpected ? 'text-red-600 font-bold' : 'text-slate-600'}>
+                        <span className={isPastExpected ? 'text-red-500' : 'text-slate-600'}>
                           {pb.expected_delivery_date ? new Date(pb.expected_delivery_date).toLocaleDateString() : '-'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex gap-3 justify-end items-center">
+                      <td className="px-4 py-3 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex gap-2 justify-end items-center">
                           {pb.status === 'ordered' && (
                             <Link 
-                              to={`/sales/new`} 
+                              to={`/sales/vehicles/new`} 
                               state={{ preBooking: pb }}
-                              className="text-emerald-600 hover:text-emerald-800 font-semibold text-xs uppercase tracking-wider px-2 py-1 bg-emerald-50 rounded"
                             >
-                              Convert to Sale
+                              <Button 
+                                size="sm"
+                                variant="secondary"
+                                className="h-8 px-4 text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100 shadow-sm transition-transform active:scale-95"
+                              >
+                                Convert to Sale
+                              </Button>
                             </Link>
                           )}
-                          <Link to={`/sales/customers/${pb.customer_id}`} className="text-indigo-600 hover:text-indigo-800 font-semibold text-xs uppercase tracking-wider">
-                            View
-                          </Link>
                           {pb.status !== 'cancelled' && pb.status !== 'delivered' && (
-                            <button 
+                            <Button 
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 px-4 text-[10px] font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-50 rounded-lg group/btn"
                               onClick={() => setStatusModalBooking({ ...pb, action: 'update' })}
-                              className="text-slate-400 hover:text-slate-900 transition-colors font-semibold text-xs uppercase tracking-wider"
                             >
-                              Status
-                            </button>
+                              <Settings2 className="w-3.5 h-3.5 mr-1.5 transition-transform group-hover/btn:rotate-45" />
+                              Change Status
+                            </Button>
                           )}
+                          <ArrowRight className="w-4 h-4 text-slate-200 group-hover:text-indigo-300 transition-all group-hover:translate-x-1 ml-2" />
                         </div>
                       </td>
                     </tr>

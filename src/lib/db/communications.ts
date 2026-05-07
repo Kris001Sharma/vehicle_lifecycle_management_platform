@@ -54,8 +54,8 @@ async function fetchCommunicationsWithProfiles(communications: any[]) {
   return communications;
 }
 
-export async function getFollowUpsDueToday(tenantId: string) {
-  const today = new Date().toISOString().split('T')[0];
+export async function getCriticalFollowUps(tenantId: string) {
+  const in48h = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString().split('T')[0];
   
   const { data, error } = await supabase
     .from('customer_communications')
@@ -67,12 +67,15 @@ export async function getFollowUpsDueToday(tenantId: string) {
     .eq('tenant_id', tenantId)
     .eq('follow_up_done', false)
     .eq('log_type', 'followup')
-    .lte('follow_up_date', today)
+    .lte('follow_up_date', in48h)
     .order('follow_up_date', { ascending: true });
 
   if (error) throw error;
   return data;
 }
+
+// Keep for backward compatibility if needed, but we'll update the dashboard
+export const getFollowUpsDueToday = getCriticalFollowUps;
 
 export async function createCommunication(commData: any, tenantId: string, userId: string) {
   if (commData.log_type === 'followup' && !commData.follow_up_date) {
@@ -98,7 +101,14 @@ export async function createCommunication(commData: any, tenantId: string, userI
   return { data };
 }
 
-export async function markFollowUpDone(commId: string, tenantId: string) {
+export async function markFollowUpDone(commId: string, tenantId: string, userId: string) {
+  // First get the communication details to create a meaningful log
+  const { data: original } = await supabase
+    .from('customer_communications')
+    .select('customer_id, interaction_type, notes')
+    .eq('id', commId)
+    .single();
+
   const { data, error } = await (supabase as any)
     .from('customer_communications')
     .update({ follow_up_done: true })
@@ -108,5 +118,17 @@ export async function markFollowUpDone(commId: string, tenantId: string) {
     .single();
 
   if (error) throw error;
+
+  // Create automated log
+  const originalData = original as any;
+  if (originalData) {
+    await createCommunication({
+      customer_id: originalData.customer_id,
+      interaction_type: 'other',
+      log_type: 'log',
+      notes: `[System] Follow-up task "${originalData.notes || originalData.interaction_type}" marked as COMPLETED`,
+    }, tenantId, userId);
+  }
+
   return { data };
 }

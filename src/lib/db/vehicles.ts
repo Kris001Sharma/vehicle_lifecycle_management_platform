@@ -1,4 +1,5 @@
 import { supabase } from '../supabase/client';
+import { createCommunication } from './communications';
 
 export async function getVariantsForSale(tenantId: string, options?: { excludePreOrderOnly?: boolean }) {
   const { data, error } = await supabase
@@ -214,7 +215,15 @@ export async function createVehicleSale(
       }
     }
 
-    // 7. Return vehicle with basic info
+    // 7. Create automated log for customer
+    await createCommunication({
+      customer_id: saleData.customer_id,
+      interaction_type: 'other',
+      log_type: 'log',
+      notes: `[System] Vehicle Sale Completed: ${saleData.vehicle_number}${preBookingId ? ' (Converted from Pre-booking)' : ''}`,
+    }, tenantId, userId);
+
+    // 8. Return vehicle with basic info
     return { vehicle };
   } catch (error) {
     // On any step failure after vehicle insert: do not attempt rollback
@@ -423,6 +432,23 @@ export async function transferVehicleOwnership(
     .single();
 
   if (updateErr) throw updateErr;
+
+  // 6. Create automated logs for both customers
+  if ((vehicle as any)?.customer_id) {
+    await createCommunication({
+      customer_id: (vehicle as any).customer_id,
+      interaction_type: 'other',
+      log_type: 'log',
+      notes: `[System] Vehicle ownership of ${updated.vehicle_number} transferred to another customer.`,
+    }, tenantId, userId);
+  }
+
+  await createCommunication({
+    customer_id: newCustomerId,
+    interaction_type: 'other',
+    log_type: 'log',
+    notes: `[System] Recorded as new owner for vehicle ${updated.vehicle_number} (Transferred).`,
+  }, tenantId, userId);
 
   return updated;
 }

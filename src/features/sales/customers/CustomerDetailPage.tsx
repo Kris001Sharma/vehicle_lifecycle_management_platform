@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -15,18 +15,26 @@ import { PreBookingFormModal } from '../pre-bookings/PreBookingFormModal';
 import { PreBookingStatusModal } from '../pre-bookings/PreBookingStatusModal';
 import { CommunicationLogModal } from '../communications/CommunicationLogModal';
 import { useToast } from '@/hooks/useToast';
-import { Phone, MessageSquare, Mail, Building, User, FileText } from 'lucide-react';
+import { Phone, MessageSquare, Mail, Building, User, FileText, Settings2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 export function CustomerDetailPage() {
   const { customerId } = useParams();
-  const { tenantId } = useAuthStore(s => s.user!) || {};
+  const { tenantId, id: userId } = useAuthStore(s => s.user!) || {};
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { showToast } = useToast();
   const queryClient = useQueryClient();
   const financeEnabled = useFinanceEnabled();
 
+  const tabParam = searchParams.get('tab');
   const [activeTab, setActiveTab] = useState<'overview' | 'pre-bookings' | 'communications'>('overview');
+
+  useEffect(() => {
+    if (tabParam === 'pre-bookings' || tabParam === 'communications' || tabParam === 'overview') {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
   const [isPreBookingModalOpen, setIsPreBookingModalOpen] = useState(false);
   const [isCommModalOpen, setIsCommModalOpen] = useState(false);
   const [statusModalBooking, setStatusModalBooking] = useState<any | null>(null);
@@ -50,7 +58,7 @@ export function CustomerDetailPage() {
   });
 
   const markDoneMutation = useMutation({
-    mutationFn: (commId: string) => markFollowUpDone(commId, tenantId!),
+    mutationFn: (commId: string) => markFollowUpDone(commId, tenantId!, userId!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['communications', customerId, tenantId] });
       queryClient.invalidateQueries({ queryKey: ['follow_ups_due', tenantId] });
@@ -353,14 +361,24 @@ export function CustomerDetailPage() {
                     </div>
                     
                     <div className="flex gap-2 justify-end pt-4 border-t border-slate-100">
-                      {pb.status === 'delivered' && !pb.vehicle_id && (
-                        <Button size="sm" onClick={() => navigate(`/sales/vehicles/new?preBookingId=${pb.id}`)}>Convert to sale →</Button>
+                      {pb.status === 'ordered' && (
+                        <Button 
+                          size="sm" 
+                          variant="secondary"
+                          className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100"
+                          onClick={() => navigate(`/sales/vehicles/new`, { state: { preBooking: pb } })}
+                        >
+                          Convert to sale →
+                        </Button>
                       )}
                       {!['delivered', 'cancelled'].includes(pb.status) && (
                         <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => setStatusModalBooking({ ...pb, action: 'cancel' })}>Cancel booking</Button>
                       )}
-                      {pb.status !== 'cancelled' && (
-                        <Button variant="secondary" size="sm" onClick={() => setStatusModalBooking({ ...pb, action: 'update' })}>Update status</Button>
+                      {pb.status !== 'cancelled' && pb.status !== 'delivered' && (
+                        <Button variant="secondary" size="sm" onClick={() => setStatusModalBooking({ ...pb, action: 'update' })}>
+                          <Settings2 className="w-3.5 h-3.5 mr-1.5" />
+                          Change Status
+                        </Button>
                       )}
                     </div>
                   </Card>
@@ -440,9 +458,16 @@ export function CustomerDetailPage() {
                         </time>
                       </div>
 
-                      {/* Entry Content */}
-                      <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm transition-shadow hover:shadow-md">
-                        <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">
+                      <div className={cn(
+                        "rounded-2xl p-5 shadow-sm transition-shadow hover:shadow-md border",
+                        comm.notes?.startsWith('[System]') 
+                          ? "bg-slate-50/50 border-slate-200 border-dashed" 
+                          : "bg-white border-slate-100"
+                      )}>
+                        <div className={cn(
+                          "text-sm leading-relaxed whitespace-pre-wrap",
+                          comm.notes?.startsWith('[System]') ? "text-slate-500 font-medium italic" : "text-slate-600"
+                        )}>
                           {comm.notes}
                         </div>
 

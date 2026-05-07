@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -9,14 +9,15 @@ import { useAuthStore } from '@/features/auth/store/authStore';
 import { supabase } from '@/lib/supabase/client';
 import { getInventorySummary } from '@/lib/db/inventory';
 import { getPreBookings } from '@/lib/db/preBookings';
-import { getFollowUpsDueToday, markFollowUpDone } from '@/lib/db/communications';
+import { getCriticalFollowUps, markFollowUpDone } from '@/lib/db/communications';
 import { getDashboardTrends } from '@/lib/db/dashboard';
 import { useToast } from '@/hooks/useToast';
-import { Phone, MessageSquare, Mail, Building, User, FileText, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, Award, Target, Trophy } from 'lucide-react';
+import { Phone, MessageSquare, Mail, Building, User, FileText, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, Award, Target, Trophy, IndianRupee } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 export function SalesDashboard() {
-  const { tenantId, email, fullName } = useAuthStore(s => s.user!) || {};
+  const navigate = useNavigate();
+  const { tenantId, id: userId, email, fullName } = useAuthStore(s => s.user!) || {};
   const queryClient = useQueryClient();
   const { showToast } = useToast();
 
@@ -71,8 +72,8 @@ export function SalesDashboard() {
   });
 
   const { data: followUps, isLoading: foLoading } = useQuery({
-    queryKey: ['follow_ups_due', tenantId],
-    queryFn: () => getFollowUpsDueToday(tenantId!),
+    queryKey: ['follow_ups_critical', tenantId],
+    queryFn: () => getCriticalFollowUps(tenantId!),
     enabled: !!tenantId,
   });
 
@@ -81,7 +82,7 @@ export function SalesDashboard() {
     queryFn: async () => {
       const [milestoneRes, configRes] = await Promise.all([
         (supabase as any).from('achievement_milestones').select('*').eq('tenant_id', tenantId).order('order_index', { ascending: true }),
-        (supabase as any).from('tenant_achievement_config').select('*').eq('tenant_id', tenantId).single()
+        (supabase as any).from('tenant_achievement_config').select('*').eq('tenant_id', tenantId).maybeSingle()
       ]);
       return { 
         milestones: (milestoneRes.data || []) as any[], 
@@ -92,12 +93,65 @@ export function SalesDashboard() {
   });
 
   const markDoneMutation = useMutation({
-    mutationFn: (commId: string) => markFollowUpDone(commId, tenantId!),
+    mutationFn: (commId: string) => markFollowUpDone(commId, tenantId!, userId!),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['follow_ups_due', tenantId] });
+      queryClient.invalidateQueries({ queryKey: ['follow_ups_critical', tenantId] });
       showToast('Follow-up cleared', 'success');
     }
   });
+
+  // Identify Mission Critical Items
+  const criticalItems = (() => {
+    const items: any[] = [];
+    
+    // 1. Follow-ups
+    if (followUps) {
+      followUps.forEach((fu: any) => {
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const fuDate = new Date(fu.follow_up_date);
+        
+        let priority = 'upcoming';
+        if (fuDate < today) priority = 'overdue';
+        else if (fuDate.getTime() === today.getTime()) priority = 'today';
+
+        items.push({
+          type: 'followup',
+          priority,
+          date: fu.follow_up_date,
+          title: fu.customer?.name,
+          subtitle: fu.notes,
+          id: fu.id,
+          meta: fu.pre_booking?.variant?.name,
+          interaction: fu.interaction_type,
+          customerId: fu.customer_id
+        });
+      });
+    }
+
+    // 2. Pending Deposits for confirmed/ordered bookings
+    if (allPreBookings) {
+      allPreBookings.forEach((pb: any) => {
+        if (!pb.deposit_received && ['confirmed', 'ordered', 'in_transit'].includes(pb.status)) {
+          items.push({
+            type: 'finance',
+            priority: 'medium',
+            title: pb.customer?.name,
+            subtitle: `Deposit Pending for ${pb.variant?.name}`,
+            meta: `Status: ${pb.status.replace('_', ' ')}`,
+            id: pb.id,
+            customerId: pb.customer_id
+          });
+        }
+      });
+    }
+
+    // Sort: Overdue first, then Today, then Finance, then Upcoming
+    return items.sort((a, b) => {
+      const pOrder: any = { overdue: 0, today: 1, medium: 2, upcoming: 3 };
+      return pOrder[a.priority] - pOrder[b.priority];
+    });
+  })();
 
   const leads = allPreBookings?.filter((pb: any) => ['enquiry', 'confirmed'].includes(pb.status)) || [];
   const awaitingDelivery = allPreBookings?.filter((pb: any) => ['ordered', 'in_transit'].includes(pb.status)) || [];
@@ -267,16 +321,16 @@ export function SalesDashboard() {
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
                   <Clock className="w-5 h-5 text-indigo-600" />
-                  Mission Critical <span className="text-slate-400 font-medium text-sm">({followUps?.length || 0})</span>
+                  Mission Critical <span className="text-slate-400 font-medium text-sm">({criticalItems.length})</span>
                 </h2>
-                {followUps && followUps.length > 0 && (
-                  <Link to="/sales/customers" className="text-xs font-bold text-indigo-600 uppercase tracking-widest hover:text-indigo-700">View All</Link>
+                {criticalItems.length > 0 && (
+                  <Link to="/sales/customers" className="text-xs font-bold text-indigo-600 uppercase tracking-widest hover:text-indigo-700">View CRM</Link>
                 )}
               </div>
               
-              {foLoading ? (
+              {foLoading || pbLoading ? (
                 <Skeleton className="h-32 w-full rounded-2xl" />
-              ) : !followUps || followUps.length === 0 ? (
+              ) : criticalItems.length === 0 ? (
                 <div className="bg-slate-50 border border-slate-100 border-dashed rounded-3xl p-8 text-center">
                   <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3">
                     <CheckCircle2 className="w-6 h-6" />
@@ -284,45 +338,110 @@ export function SalesDashboard() {
                   <p className="text-slate-500 font-medium text-sm">All follow-ups cleared. Good job!</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {followUps.slice(0, 4).map((fu: any) => {
-                    const today = new Date();
-                    today.setHours(0,0,0,0);
-                    const isOverdue = new Date(fu.follow_up_date) < today;
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {criticalItems.slice(0, 6).map((item: any) => {
+                    const isFollowUp = item.type === 'followup';
+                    const isOverdue = item.priority === 'overdue';
+                    const isToday = item.priority === 'today';
+                    const isFinance = item.type === 'finance';
+
+                    const handleClick = () => {
+                      const tab = isFinance ? 'pre-bookings' : 'communications';
+                      navigate(`/sales/customers/${item.customerId}?tab=${tab}`);
+                    };
 
                     return (
-                      <Card key={fu.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-slate-200">
+                      <div 
+                        key={`${item.type}-${item.id}`} 
+                        onClick={handleClick}
+                        className={cn(
+                          "group relative p-4 rounded-2xl border transition-all duration-300 cursor-pointer overflow-hidden",
+                          "bg-white hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1 active:scale-[0.98]",
+                          isOverdue ? "border-red-100 hover:border-red-200" : 
+                          isToday ? "border-amber-100 hover:border-amber-200" : 
+                          isFinance ? "border-purple-100 hover:border-purple-200" : 
+                          "border-slate-100 hover:border-indigo-100"
+                        )}
+                      >
+                        {/* Status Accent Line */}
+                        <div className={cn(
+                          "absolute left-0 top-0 bottom-0 w-1",
+                          isOverdue ? "bg-red-500" : isToday ? "bg-amber-500" : isFinance ? "bg-purple-500" : "bg-indigo-300"
+                        )} />
+
                         <div className="flex items-start gap-4">
-                          <div className="p-2.5 bg-slate-100 rounded-full shrink-0">
-                            {renderIcon(fu.interaction_type)}
+                          <div className={cn(
+                            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110 duration-300 shadow-sm",
+                            isOverdue ? "bg-red-50 text-red-600" : 
+                            isToday ? "bg-amber-50 text-amber-600" : 
+                            isFinance ? "bg-purple-50 text-purple-600" : 
+                            "bg-slate-50 text-indigo-500"
+                          )}>
+                            {isFinance ? <IndianRupee className="w-5 h-5" /> : renderIcon(item.interaction)}
                           </div>
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2 mb-1">
-                              <Link to={`/sales/customers/${fu.customer_id}`} className="font-bold text-slate-900 hover:text-indigo-600 transition-colors">
-                                {fu.customer?.name}
-                              </Link>
-                              {isOverdue ? (
-                                <Badge variant="error" className="text-[9px] uppercase font-bold tracking-wider rounded-md py-0 px-1.5">Overdue</Badge>
-                              ) : (
-                                <Badge variant="warning" className="text-[9px] uppercase font-bold tracking-wider rounded-md py-0 px-1.5">Today</Badge>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <h3 className="font-bold text-slate-900 truncate group-hover:text-indigo-600 transition-colors">
+                                {item.title}
+                              </h3>
+                              {isOverdue && (
+                                <span className="text-[9px] font-black uppercase tracking-widest text-red-600 px-1.5 py-0.5 bg-red-50 rounded">Alert</span>
                               )}
                             </div>
-                            <div className="text-sm text-slate-600 font-medium">{fu.notes}</div>
-                            {fu.pre_booking && <div className="text-[11px] font-bold text-indigo-500 mt-1 uppercase tracking-wider">Re: {fu.pre_booking.variant?.name}</div>}
+                            
+                            <p className="text-xs text-slate-500 font-medium line-clamp-1 group-hover:text-slate-700 transition-colors">
+                              {item.subtitle}
+                            </p>
+
+                            <div className="flex items-center flex-wrap gap-2 mt-2">
+                              {isFinance ? (
+                                <Badge className="text-[9px] uppercase font-bold tracking-wider rounded-md py-0 px-1.5 bg-purple-100 text-purple-700 border-purple-200/50">
+                                  Finance Recall
+                                </Badge>
+                              ) : (
+                                <Badge variant="neutral" className={cn(
+                                  "text-[9px] uppercase font-bold tracking-wider rounded-md py-0 px-1.5",
+                                  isOverdue ? "bg-red-100/50 text-red-700 border-red-200/50" : 
+                                  isToday ? "bg-amber-100/50 text-amber-700 border-amber-200/50" : 
+                                  "bg-indigo-50 text-indigo-600 border-indigo-100/50"
+                                )}>
+                                  {isOverdue ? 'Overdue' : isToday ? 'Due Today' : 'Follow Up'}
+                                </Badge>
+                              )}
+                              
+                              {item.meta && (
+                                <span className="text-[10px] font-bold text-slate-400 capitalize truncate max-w-[120px]">
+                                  • {item.meta.toLowerCase()}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                          <Button 
-                            variant="secondary" 
-                            size="sm" 
-                            className="bg-white hover:bg-slate-50 border border-slate-200 shadow-sm font-bold text-xs rounded-full px-4"
-                            onClick={() => markDoneMutation.mutate(fu.id)} 
-                            disabled={markDoneMutation.isPending}
-                          >
-                            Mark Done
-                          </Button>
+
+                        {/* Complete Button Overlay for Follow-ups */}
+                        {isFollowUp && (
+                          <div className="absolute right-3 bottom-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button 
+                              variant="secondary" 
+                              size="sm" 
+                              className="h-7 px-3 text-[10px] font-bold bg-white/90 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 border-slate-200 shadow-sm rounded-lg"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                markDoneMutation.mutate(item.id);
+                              }} 
+                              disabled={markDoneMutation.isPending}
+                            >
+                              Resolve
+                            </Button>
+                          </div>
+                        )}
+                        
+                        {/* Subtle Chevron indicator */}
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-300 group-hover:text-indigo-400 opacity-0 group-hover:opacity-100 transition-all group-hover:translate-x-1">
+                          <Zap className="w-3 h-3" />
                         </div>
-                      </Card>
+                      </div>
                     );
                   })}
                 </div>

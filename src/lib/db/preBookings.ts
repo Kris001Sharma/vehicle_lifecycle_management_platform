@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/client';
+import { createCommunication } from './communications';
 
 export async function getPreBookings(tenantId: string, filters?: { status?: string, customerId?: string, deliveryFrom?: string, deliveryTo?: string, vehicleId?: string }) {
   let query = supabase
@@ -137,6 +138,17 @@ export async function createPreBooking(bookingData: any, tenantId: string, userI
     }
     throw error;
   }
+
+  // Create automated log
+  const depositInfo = bookingData.deposit_received ? ` (Deposit received: ${bookingData.deposit_amount})` : '';
+  await createCommunication({
+    customer_id: bookingData.customer_id,
+    pre_booking_id: booking.id,
+    interaction_type: 'other',
+    log_type: 'log',
+    notes: `[System] New pre-booking created for ${booking.variant?.name || 'selected model'}${depositInfo}`,
+  }, tenantId, userId);
+
   return { booking };
 }
 
@@ -180,9 +192,31 @@ export async function updatePreBookingStatus(bookingId: string, newStatus: strin
     .single();
 
   if (error) throw error;
+
+  // Create automated log
+  await createCommunication({
+    customer_id: booking.customer_id,
+    pre_booking_id: booking.id,
+    interaction_type: 'other',
+    log_type: 'log',
+    notes: `[System] Status moved to ${newStatus.replace('_', ' ').toUpperCase()} by current executive`,
+  }, tenantId, userId);
+
   return { booking };
 }
 
 export async function cancelPreBooking(bookingId: string, reason: string, tenantId: string, userId: string) {
-  return updatePreBookingStatus(bookingId, 'cancelled', { cancellation_reason: reason }, tenantId, userId);
+  const result = await updatePreBookingStatus(bookingId, 'cancelled', { cancellation_reason: reason }, tenantId, userId);
+  
+  if (result.booking) {
+    await createCommunication({
+      customer_id: result.booking.customer_id,
+      pre_booking_id: result.booking.id,
+      interaction_type: 'other',
+      log_type: 'log',
+      notes: `[System] Pre-booking CANCELLED. Reason: ${reason}`,
+    }, tenantId, userId);
+  }
+  
+  return result;
 }
