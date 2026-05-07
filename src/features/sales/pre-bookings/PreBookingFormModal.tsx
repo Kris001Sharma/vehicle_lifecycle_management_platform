@@ -1,20 +1,29 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
+import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { createPreBooking } from '@/lib/db/preBookings';
 import { getVariantsForSale } from '@/lib/db/vehicles';
 import { getInventoryUnits } from '@/lib/db/inventory';
+import { searchCustomers } from '@/lib/db/customers';
 import { useFinanceEnabled } from '@/lib/catalog/financeConfig';
 import { useToast } from '@/hooks/useToast';
 import { useFormDirtyNavigation } from '@/hooks/useFormDirtyNavigation';
+import { useDebounce } from '@/hooks/useDebounce';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Check, Search, User } from 'lucide-react';
+import { cn } from '@/utils/cn';
 
 export function PreBookingFormModal({ isOpen, onClose, customerId, customerName, tenantId, onSuccess }: any) {
   const { user } = useAuthStore();
   const { showToast } = useToast();
   const financeEnabled = useFinanceEnabled();
+
+  const [internalSelectedCustomer, setInternalSelectedCustomer] = useState<any>(null);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const debouncedCustomerSearch = useDebounce(customerSearch, 300);
 
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [selectedModelId, setSelectedModelId] = useState('');
@@ -37,6 +46,22 @@ export function PreBookingFormModal({ isOpen, onClose, customerId, customerName,
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      setInternalSelectedCustomer(null);
+      setCustomerSearch('');
+      setSelectedCategoryId('');
+      setSelectedModelId('');
+      setSelectedVariantId('');
+      setColourPreference('');
+      setSpecialRequirements('');
+      setLinkStockUnit(false);
+      setSelectedUnitId('');
+      setDepositReceived(false);
+      setDepositAmount('');
+    }
+  }, [isOpen]);
 
   const isDirty = useMemo(() => {
     return selectedCategoryId !== '' || 
@@ -77,6 +102,9 @@ export function PreBookingFormModal({ isOpen, onClose, customerId, customerName,
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const finalCustomerId = customerId || internalSelectedCustomer?.id;
+    if (!finalCustomerId) return showToast("Please select a customer", "error");
     if (!selectedVariantId) return showToast("Please select a variant", "error");
     if (!bookingDate) return showToast("Booking date is required", "error");
     
@@ -87,7 +115,7 @@ export function PreBookingFormModal({ isOpen, onClose, customerId, customerName,
     try {
       setIsSubmitting(true);
       const data = {
-        customer_id: customerId,
+        customer_id: finalCustomerId,
         variant_id: selectedVariantId,
         booking_date: bookingDate,
         expected_delivery_date: expectedDeliveryDate || null,
@@ -117,20 +145,87 @@ export function PreBookingFormModal({ isOpen, onClose, customerId, customerName,
     }
   };
 
+  const { data: customerSearchData, isLoading: isSearchingCustomers } = useQuery({
+    queryKey: ['customers_search', tenantId, debouncedCustomerSearch],
+    queryFn: () => searchCustomers(debouncedCustomerSearch, tenantId!, 1, 10),
+    enabled: !!tenantId && isOpen && !customerId && debouncedCustomerSearch.length > 0 && !internalSelectedCustomer
+  });
+
   return (
     <>
       <Modal 
         isOpen={isOpen} 
         onClose={handleClose} 
-        title={`New pre-booking for ${customerName}`}
+        title={customerId ? `New pre-booking for ${customerName}` : `New pre-booking`}
         footer={
           <>
             <Button variant="secondary" onClick={handleClose} disabled={isSubmitting}>Cancel</Button>
-            <Button type="submit" form="pre-booking-form" disabled={isSubmitting || !selectedVariantId}>Create pre-booking</Button>
+            <Button type="submit" form="pre-booking-form" disabled={isSubmitting || !selectedVariantId || (!customerId && !internalSelectedCustomer)}>Create pre-booking</Button>
           </>
         }
       >
         <form id="pre-booking-form" onSubmit={handleSubmit} className="space-y-6">
+        
+        {!customerId && (
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-slate-700">Customer</label>
+            {internalSelectedCustomer ? (
+              <div className="flex items-center justify-between p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
+                    <User className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-bold text-indigo-900">{internalSelectedCustomer.name}</div>
+                    <div className="text-[10px] text-indigo-600 font-medium">{internalSelectedCustomer.phone}</div>
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" className="text-indigo-600 hover:bg-indigo-100" onClick={() => setInternalSelectedCustomer(null)}>Change</Button>
+              </div>
+            ) : (
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="h-4 w-4 text-slate-400" />
+                </div>
+                <input
+                  type="text"
+                  className="block w-full pl-10 pr-3 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-indigo-500 text-sm"
+                  placeholder="Search customer by name or phone..."
+                  value={customerSearch}
+                  onChange={(e) => setCustomerSearch(e.target.value)}
+                />
+                
+                {customerSearchData?.rows && customerSearchData.rows.length > 0 && (
+                  <div className="absolute z-[100] mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    {customerSearchData.rows.map((c: any) => (
+                      <div 
+                        key={c.id} 
+                        className="px-4 py-2 hover:bg-slate-50 cursor-pointer flex justify-between items-center border-b border-slate-50 last:border-0"
+                        onClick={() => {
+                          setInternalSelectedCustomer(c);
+                          setCustomerSearch('');
+                        }}
+                      >
+                        <div>
+                          <div className="text-xs font-bold text-slate-900">{c.name}</div>
+                          <div className="text-[10px] text-slate-500">{c.phone}</div>
+                        </div>
+                        <Badge variant="neutral" className="text-[9px] uppercase">{c.customer_type.replace('_', ' ')}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {customerSearch.length > 2 && !isSearchingCustomers && customerSearchData?.rows?.length === 0 && (
+                  <div className="absolute z-[100] mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg p-4 text-center text-xs text-slate-500">
+                    No customers found. 
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="space-y-4">
           <div>
              <label className="block text-sm font-medium text-slate-700 mb-2">Category</label>
@@ -190,8 +285,68 @@ export function PreBookingFormModal({ isOpen, onClose, customerId, customerName,
         </div>
 
         <div>
-           <label className="block text-sm font-medium text-slate-700 mb-1">Colour preference</label>
-           <input type="text" className="w-full px-3 py-2 border border-slate-200 rounded-md placeholder-slate-400" placeholder="e.g. Pearl White" value={colourPreference} onChange={(e) => setColourPreference(e.target.value)} />
+            <label className="block text-sm font-medium text-slate-700 mb-2">Colour preference</label>
+            {selectedVariant?.specs?.colour_options && selectedVariant.specs.colour_options.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {selectedVariant.specs.colour_options.map((opt: any) => (
+                  <button
+                    key={opt.name}
+                    type="button"
+                    onClick={() => setColourPreference(opt.name)}
+                    className={cn(
+                      "flex items-center gap-2 p-2 rounded-lg border text-left transition-all",
+                      colourPreference === opt.name 
+                        ? "bg-indigo-50 border-indigo-600 ring-1 ring-indigo-600" 
+                        : "bg-white border-slate-200 hover:border-slate-300"
+                    )}
+                  >
+                    <div 
+                      className="w-5 h-5 rounded-full border border-slate-200 shrink-0" 
+                      style={{ backgroundColor: opt.hex }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11px] font-bold text-slate-900 truncate leading-tight">{opt.name}</div>
+                    </div>
+                    {colourPreference === opt.name && (
+                      <Check className="w-3 h-3 text-indigo-600 shrink-0" />
+                    )}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setColourPreference('Other')}
+                  className={cn(
+                    "flex items-center gap-2 p-2 rounded-lg border text-left transition-all",
+                    colourPreference === 'Other' 
+                      ? "bg-indigo-50 border-indigo-600 ring-1 ring-indigo-600" 
+                      : "bg-white border-slate-200 hover:border-slate-300"
+                  )}
+                >
+                  <div className="w-5 h-5 rounded-full border border-slate-200 shrink-0 bg-gradient-to-tr from-slate-200 via-slate-100 to-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-400">?</div>
+                  <div className="text-[11px] font-bold text-slate-900 leading-tight">Other</div>
+                  {colourPreference === 'Other' && (
+                    <Check className="w-3 h-3 text-indigo-600 shrink-0" />
+                  )}
+                </button>
+              </div>
+            ) : (
+              <input 
+                type="text" 
+                className="w-full px-3 py-2 border border-slate-200 rounded-md placeholder-slate-400" 
+                placeholder="e.g. Pearl White" 
+                value={colourPreference} 
+                onChange={(e) => setColourPreference(e.target.value)} 
+              />
+            )}
+            {colourPreference === 'Other' && (
+               <input 
+                 type="text" 
+                 className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-md placeholder-slate-400 text-sm" 
+                 placeholder="Specify custom colour..." 
+                 autoFocus
+                 onChange={(e) => setColourPreference(`Other: ${e.target.value}`)}
+               />
+            )}
         </div>
 
         <div>

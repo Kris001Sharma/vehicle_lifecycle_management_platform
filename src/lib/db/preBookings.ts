@@ -8,6 +8,7 @@ export async function getPreBookings(tenantId: string, filters?: { status?: stri
       customer:customers(name, phone, customer_type),
       variant:vehicle_variants (
         name,
+        specs,
         model:vehicle_models (
           manufacturer, name, category:vehicle_categories (name)
         ),
@@ -61,7 +62,7 @@ export async function getPreBooking(bookingId: string, tenantId: string) {
     .select(`
       *,
       customer:customers(name, phone, customer_type),
-      variant:vehicle_variants(name),
+      variant:vehicle_variants(name, specs),
       model:vehicle_variants(model:vehicle_models(manufacturer, name, category:vehicle_categories(name))),
       powertrain:vehicle_variants(powertrain:powertrain_types(display_label)),
       inventory_unit:inventory_units(chassis_number, colour, condition)
@@ -83,7 +84,7 @@ export async function getPreBookingsByCustomer(customerId: string, tenantId: str
     .select(`
       *,
       customer:customers(name, phone, customer_type),
-      variant:vehicle_variants(name),
+      variant:vehicle_variants(name, specs),
       model:vehicle_variants(model:vehicle_models(manufacturer, name, category:vehicle_categories(name))),
       powertrain:vehicle_variants(powertrain:powertrain_types(display_label)),
       inventory_unit:inventory_units(chassis_number, colour, condition)

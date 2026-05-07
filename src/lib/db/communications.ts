@@ -1,30 +1,32 @@
 import { supabase } from '@/lib/supabase/client';
 
 export async function getCommunications(customerId: string, tenantId: string, filters?: { preBookingId?: string }) {
-  let query = supabase
-    .from('customer_communications')
-    .select(`
-      *,
-      logged_by_user:auth.users!customer_communications_logged_by_fkey(id),
-      pre_booking:pre_bookings(id, variant_id, variant:vehicle_variants(name), status)
-    `)
-    .eq('customer_id', customerId)
-    .eq('tenant_id', tenantId)
-    .order('logged_at', { ascending: false });
+  try {
+    let query = supabase
+      .from('customer_communications')
+      .select(`
+        *,
+        pre_booking:pre_bookings(id, variant_id, variant:vehicle_variants(name), status)
+      `)
+      .eq('customer_id', customerId)
+      .eq('tenant_id', tenantId)
+      .order('logged_at', { ascending: false });
 
-  if (filters?.preBookingId) {
-    query = query.eq('pre_booking_id', filters.preBookingId);
+    if (filters?.preBookingId) {
+      query = query.eq('pre_booking_id', filters.preBookingId);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error('Error fetching communications:', error);
+      throw error;
+    }
+    
+    return fetchCommunicationsWithProfiles(data);
+  } catch (err) {
+    console.error('getCommunications failed:', err);
+    throw err;
   }
-
-  const { data, error } = await query;
-  if (error) throw error;
-  
-  // Note: auth.users join is restricted globally in supabase, we'd normally join user_profiles 
-  // Let's actually use user_profiles if it exists. Re-evaluating the join.
-  // The prompt says: "Joins logged_by to user_profiles for name."
-  // So I'll modify the query below to correctly join user_profiles instead of auth.users directly.
-
-  return fetchCommunicationsWithProfiles(data);
 }
 
 async function fetchCommunicationsWithProfiles(communications: any[]) {

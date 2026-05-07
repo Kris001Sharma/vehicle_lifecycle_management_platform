@@ -104,7 +104,19 @@ export function PreBookingsPage() {
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <div className="text-sm font-bold text-slate-900 tracking-tight">{pb.customer?.name}</div>
-                    <div className="text-xs font-semibold text-slate-500 mt-0.5">{pb.variant?.name}</div>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="text-xs font-semibold text-slate-500">{pb.variant?.name}</div>
+                      {pb.colour_preference && (() => {
+                        const opt = pb.variant?.specs?.colour_options?.find((o: any) => o.name === pb.colour_preference);
+                        return opt ? (
+                          <div 
+                            className="w-2.5 h-2.5 rounded-full border border-slate-200" 
+                            style={{ backgroundColor: opt.hex }}
+                            title={opt.name}
+                          />
+                        ) : null;
+                      })()}
+                    </div>
                   </div>
                   <Badge variant={getStatusColor(pb.status) as any} className="capitalize px-1.5 py-0 border-0 font-bold text-[9px] uppercase tracking-wider">
                     {pb.status.replace('_', ' ')}
@@ -171,7 +183,19 @@ export function PreBookingsPage() {
                     <tr key={pb.id} className="hover:bg-slate-50/50 transition-all border-b border-slate-50 last:border-0 growable-row">
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-slate-900 tracking-tight">{pb.customer?.name}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm font-semibold text-slate-900">{pb.variant?.name}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm font-semibold text-slate-900">{pb.variant?.name}</div>
+                          {pb.colour_preference && (() => {
+                            const opt = pb.variant?.specs?.colour_options?.find((o: any) => o.name === pb.colour_preference);
+                            return opt ? (
+                              <div 
+                                className="w-3 h-3 rounded-full border border-slate-200" 
+                                style={{ backgroundColor: opt.hex }}
+                                title={opt.name}
+                              />
+                            ) : null;
+                          })()}
+                        </div>
                         <div className="text-[10px] text-slate-500 font-medium">{pb.model?.manufacturer}</div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
