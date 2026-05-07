@@ -40,13 +40,13 @@ export function CustomerDetailPage() {
   const { data: preBookings, isLoading: isLoadingPreBookings } = useQuery({
     queryKey: ['pre_bookings', customerId, tenantId],
     queryFn: () => getPreBookingsByCustomer(customerId!, tenantId!),
-    enabled: !!tenantId && !!customerId && activeTab === 'pre-bookings',
+    enabled: !!tenantId && !!customerId,
   });
 
   const { data: communications, isLoading: isLoadingComms } = useQuery({
     queryKey: ['communications', customerId, tenantId],
     queryFn: () => getCommunications(customerId!, tenantId!),
-    enabled: !!tenantId && !!customerId && activeTab === 'communications',
+    enabled: !!tenantId && !!customerId,
   });
 
   const markDoneMutation = useMutation({
@@ -102,6 +102,9 @@ export function CustomerDetailPage() {
     }
   };
 
+  const hasActivePreBooking = preBookings?.some((pb: any) => !['delivered', 'cancelled'].includes(pb.status));
+  const hasActiveFollowUp = communications?.some((c: any) => c.log_type === 'followup' && !c.follow_up_done);
+
   return (
     <PageWrapper
       title={customer.name}
@@ -111,20 +114,29 @@ export function CustomerDetailPage() {
         <nav className="flex">
           {[
             { id: 'overview', label: 'Overview', short: 'Info' },
-            { id: 'pre-bookings', label: 'Pre Bookings', short: 'Bookings' },
-            { id: 'communications', label: 'Communications', short: 'Timeline' }
+            { id: 'pre-bookings', label: 'Pre Bookings', short: 'Bookings', indicator: hasActivePreBooking },
+            { id: 'communications', label: 'Communications', short: 'Timeline', indicator: hasActiveFollowUp }
           ].map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex-1 whitespace-nowrap py-3 border-b-2 font-semibold text-[10px] sm:text-xs uppercase tracking-wider transition-colors text-center ${
+              className={cn(
+                "flex-1 whitespace-nowrap py-3 border-b-2 font-semibold text-[10px] sm:text-xs uppercase tracking-wider transition-colors text-center relative",
                 activeTab === tab.id
                   ? 'border-indigo-600 text-indigo-600'
                   : 'border-transparent text-slate-400 hover:text-slate-600'
-              }`}
+              )}
             >
-              <span className="hidden sm:inline">{tab.label}</span>
-              <span className="sm:hidden">{tab.short}</span>
+              <span className="flex items-center justify-center gap-1.5">
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden">{tab.short}</span>
+                {tab.indicator && (
+                  <span className={cn(
+                    "w-1.5 h-1.5 rounded-full",
+                    tab.id === 'pre-bookings' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+                  )} />
+                )}
+              </span>
             </button>
           ))}
         </nav>

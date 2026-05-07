@@ -394,9 +394,6 @@ export function SalesDashboard() {
                     </h4>
                     <div className="text-3xl font-black tracking-tight flex items-center gap-2">
                        {nextMilestone.name}
-                       <div className="hidden group-hover/card:flex absolute top-12 left-5 bg-white text-slate-900 text-[10px] px-2 py-1 rounded shadow-xl font-bold border border-slate-100 z-50 whitespace-nowrap animate-in fade-in zoom-in duration-200">
-                         Target: {nextMilestone.sales_target} Sales & ₹{Math.round(nextMilestone.revenue_target / 100000)}L Revenue
-                       </div>
                     </div>
                   </div>
                   <div className="text-right">
@@ -478,9 +475,6 @@ export function SalesDashboard() {
                             {m.sales_target > 0 && m.revenue_target > 0 && ' + '}
                             {m.revenue_target > 0 && `₹${Math.round(m.revenue_target / 100000)}L`}
                           </div>
-                        </div>
-                        <div className="hidden group-hover/badge:block absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] px-2 py-1 rounded shadow-xl whitespace-nowrap z-50">
-                          Targets: {m.sales_target > 0 ? `${m.sales_target} Sales` : ''} {m.sales_target > 0 && m.revenue_target > 0 ? '/' : ''} {m.revenue_target > 0 ? `₹${Math.round(m.revenue_target / 100000)}L` : ''}
                         </div>
                       </div>
                     );

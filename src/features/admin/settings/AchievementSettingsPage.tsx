@@ -81,8 +81,8 @@ export function AchievementSettingsPage() {
           .select('id')
           .eq('tenant_id', tenantId);
         
-        const currentIds = toUpsert.map(m => m.id).filter(Boolean);
-        const toDeleteIds = existing?.map(m => m.id).filter(id => !currentIds.includes(id)) || [];
+        const currentIds = toUpsert.map((m: any) => m.id).filter(Boolean);
+        const toDeleteIds = existing?.map((m: any) => m.id).filter((id: string) => !currentIds.includes(id)) || [];
 
         if (toDeleteIds.length > 0) {
           await (supabase as any).from('achievement_milestones').delete().in('id', toDeleteIds);
@@ -295,7 +295,7 @@ export function AchievementSettingsPage() {
         <div className="fixed bottom-0 left-0 right-0 lg:left-64 bg-white/80 backdrop-blur-md border-t border-slate-200 py-4 px-6 lg:px-8 z-50">
           <div className="max-w-4xl mx-auto flex justify-end gap-3 w-full">
             <Button 
-              variant="outline" 
+              variant="secondary" 
               onClick={() => {
                 setHasInitialized(false);
                 queryClient.invalidateQueries({ queryKey: ['achievement_config', tenantId] });
