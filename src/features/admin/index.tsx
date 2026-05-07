@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Card } from '@/components/ui/Card';
@@ -27,7 +27,7 @@ const ADMIN_NAV = [
   { label: 'Audit Log', path: '/admin/audit-logs', icon: History },
   { 
     label: 'Settings', 
-    path: '/admin/settings/catalog', 
+    path: '/admin/settings', 
     icon: Settings,
     children: [
         { label: 'Catalog Settings', path: '/admin/settings/catalog' },
@@ -39,19 +39,21 @@ const ADMIN_NAV = [
 function AdminDashboardContent() {
   return (
     <PageWrapper title="Admin Dashboard">
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
-        <Card title="Total Users" className="p-5 border-slate-200 shadow-sm">
-          <Skeleton className="h-10 w-24 mb-2" />
-          <Skeleton className="h-4 w-32" />
-        </Card>
-        <Card title="Active Listings" className="p-5 border-slate-200 shadow-sm">
-          <Skeleton className="h-10 w-24 mb-2" />
-          <Skeleton className="h-4 w-32" />
-        </Card>
-        <Card title="System Alerts" className="p-5 border-slate-200 shadow-sm">
-          <Skeleton className="h-10 w-24 mb-2" />
-          <Skeleton className="h-4 w-32" />
-        </Card>
+      <div className="max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+          <Card title="Total Users" className="p-5 border-slate-200 shadow-sm">
+            <Skeleton className="h-10 w-24 mb-2" />
+            <Skeleton className="h-4 w-32" />
+          </Card>
+          <Card title="Active Listings" className="p-5 border-slate-200 shadow-sm">
+            <Skeleton className="h-10 w-24 mb-2" />
+            <Skeleton className="h-4 w-32" />
+          </Card>
+          <Card title="System Alerts" className="p-5 border-slate-200 shadow-sm">
+            <Skeleton className="h-10 w-24 mb-2" />
+            <Skeleton className="h-4 w-32" />
+          </Card>
+        </div>
       </div>
     </PageWrapper>
   );
@@ -97,6 +99,7 @@ export default function AdminDashboard() {
           <Route path="/catalog/models/:modelId/edit" element={<ModelFormPage />} />
           <Route path="/catalog/variants/new" element={<VariantFormV2 />} />
           <Route path="/catalog/variants/:variantId/edit" element={<VariantFormV2 />} />
+          <Route path="/settings" element={<Navigate to="/admin/settings/catalog" replace />} />
           <Route path="/settings/catalog" element={<CatalogSettingsPage />} />
           <Route path="/settings/achievements" element={<AchievementSettingsPage />} />
         </Routes>

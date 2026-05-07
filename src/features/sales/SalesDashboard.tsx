@@ -106,12 +106,80 @@ export function SalesDashboard() {
   const revenueCount = trends?.revenueCurrent || 0;
   const milestones = (achievementData?.milestones || []) as any[];
   
-  // Find the next milestone (first one not fully completed)
-  const nextMilestone = milestones.find(m => salesCount < m.sales_target || revenueCount < m.revenue_target) || milestones[milestones.length - 1] || {
-    name: 'Silver Seller',
-    sales_target: 10,
-    revenue_target: 5000000
+  const isMilestoneCompleted = (m: any) => {
+    const salesPass = !m.sales_target || salesCount >= m.sales_target;
+    const revenuePass = !m.revenue_target || revenueCount >= m.revenue_target;
+    return salesPass && revenuePass;
   };
+
+  // Find the next milestone (first one not fully completed)
+  const nextMilestone = milestones.find(m => !isMilestoneCompleted(m)) || milestones[milestones.length - 1] || {
+    name: 'Ignition',
+    sales_target: 1,
+    revenue_target: 0,
+    badge_color: 'amber'
+  };
+
+  const getMilestoneTheme = (color: string) => {
+    switch (color) {
+      case 'slate': // Silver
+        return {
+          card: "bg-gradient-to-br from-slate-400 via-slate-200 to-slate-500 text-slate-900 border-slate-300",
+          accent: "bg-slate-900/10",
+          progressBg: "bg-slate-900/20",
+          progressBar: "bg-slate-900",
+          textSecondary: "text-slate-700",
+          badge: "bg-slate-200 text-slate-700 border-slate-300"
+        };
+      case 'yellow': // Gold
+        return {
+          card: "bg-gradient-to-br from-amber-300 via-yellow-100 to-amber-500 text-amber-900 border-amber-400",
+          accent: "bg-amber-900/10",
+          progressBg: "bg-amber-900/20",
+          progressBar: "bg-amber-900",
+          textSecondary: "text-amber-700",
+          badge: "bg-amber-100 text-amber-700 border-amber-300"
+        };
+      case 'indigo': // Platinum
+        return {
+          card: "bg-gradient-to-br from-slate-600 via-indigo-900 to-slate-900 text-white border-indigo-500/30",
+          accent: "bg-white/10",
+          progressBg: "bg-indigo-950/50",
+          progressBar: "bg-white shadow-[0_0_10px_rgba(255,255,255,0.5)]",
+          textSecondary: "text-indigo-200",
+          badge: "bg-indigo-500/20 text-indigo-100 border-indigo-400/30"
+        };
+      case 'cyan': // Diamond
+        return {
+          card: "bg-gradient-to-br from-sky-400 via-blue-50 to-indigo-400 text-blue-900 border-blue-200",
+          accent: "bg-blue-900/10",
+          progressBg: "bg-blue-900/10",
+          progressBar: "bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.4)]",
+          textSecondary: "text-blue-700",
+          badge: "bg-white/50 text-blue-700 border-blue-200"
+        };
+      case 'purple': // Godfather / Boss
+        return {
+          card: "bg-gradient-to-br from-gray-900 via-slate-800 to-black text-white border-emerald-500/20",
+          accent: "bg-emerald-500/10",
+          progressBg: "bg-black/50",
+          progressBar: "bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,0.4)]",
+          textSecondary: "text-slate-400",
+          badge: "bg-emerald-500/20 text-emerald-400 border-emerald-400/30"
+        };
+      default: // Amber / Rookie
+        return {
+          card: "bg-gradient-to-br from-indigo-600 to-indigo-800 text-white border-0",
+          accent: "bg-white/10",
+          progressBg: "bg-indigo-900/40",
+          progressBar: "bg-white",
+          textSecondary: "text-indigo-200",
+          badge: "bg-white/10 text-white"
+        };
+    }
+  };
+
+  const theme = getMilestoneTheme(nextMilestone.badge_color || 'amber');
   
   const renderKPI = (title: string, value: number | string, icon: React.ReactNode, trend?: number, link?: string, loading?: boolean) => {
     const isPositive = trend && trend > 0;
@@ -316,12 +384,12 @@ export function SalesDashboard() {
                 Achievements
               </h2>
               
-              <Card className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white p-5 border-0 shadow-lg relative overflow-hidden rounded-2xl mb-4 group/card">
-                <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover/card:scale-110 transition-transform duration-500" />
+              <Card className={cn("p-5 shadow-lg relative overflow-hidden rounded-2xl mb-4 group/card transition-all duration-500 border", theme.card)}>
+                <div className={cn("absolute right-0 top-0 w-32 h-32 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 group-hover/card:scale-110 transition-transform duration-500", theme.accent)} />
                 
                 <div className="flex justify-between items-start mb-6">
                   <div>
-                    <h4 className="text-[10px] uppercase tracking-[0.2em] font-bold text-indigo-200/80 flex items-center gap-1.5 mb-1">
+                    <h4 className={cn("text-[10px] uppercase tracking-[0.2em] font-bold flex items-center gap-1.5 mb-1", theme.textSecondary)}>
                       <Target className="w-3 h-3" /> Next Milestone
                     </h4>
                     <div className="text-3xl font-black tracking-tight flex items-center gap-2">
@@ -332,47 +400,53 @@ export function SalesDashboard() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[10px] font-bold text-indigo-200/50 uppercase tracking-widest">Current Status</div>
-                    <div className="text-xs font-bold text-emerald-400">
-                      {salesCount >= nextMilestone.sales_target && revenueCount >= nextMilestone.revenue_target ? 'Milestone Reached! 🏆' : 'On Track 🚀'}
+                    <div className={cn("text-[10px] font-bold uppercase tracking-widest", theme.textSecondary)}>Current Status</div>
+                    <div className={cn("text-xs font-bold", isMilestoneCompleted(nextMilestone) ? "text-emerald-500" : "text-white/80")}>
+                      {isMilestoneCompleted(nextMilestone) ? 'Milestone Reached! 🏆' : 'On Track 🚀'}
                     </div>
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-6 relative">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
                   {/* Timeline pointer - visual line connecting them */}
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-8 bg-indigo-500/20 hidden md:block" />
+                  {nextMilestone.sales_target > 0 && nextMilestone.revenue_target > 0 && (
+                    <div className={cn("absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-0.5 h-8 hidden md:block", theme.accent)} />
+                  )}
 
-                  <div className="group/metric">
-                    <div className="flex justify-between items-end mb-2">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-100/70">Sales Volume</span>
-                      <span className="text-lg font-black text-white">{salesCount} <span className="text-indigo-300 font-bold text-xs">/ {nextMilestone.sales_target}</span></span>
-                    </div>
-                    <div className="h-2 bg-indigo-900/40 rounded-full overflow-hidden p-0.5 backdrop-blur-sm relative">
-                      <div className="h-full bg-white rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(255,255,255,0.5)] relative" style={{ width: `${Math.min((salesCount / nextMilestone.sales_target) * 100, 100)}%` }}>
-                        <div className="absolute right-0 top-0 h-full w-1 bg-indigo-400 group-hover/metric:animate-pulse" />
+                  {nextMilestone.sales_target > 0 && (
+                    <div className="group/metric">
+                      <div className="flex justify-between items-end mb-2">
+                        <span className={cn("text-[11px] font-bold uppercase tracking-wider", theme.textSecondary)}>Sales Volume</span>
+                        <span className="text-lg font-black">{salesCount} <span className={cn("font-bold text-xs", theme.textSecondary)}>/ {nextMilestone.sales_target}</span></span>
+                      </div>
+                      <div className={cn("h-2 rounded-full overflow-hidden p-0.5 backdrop-blur-sm relative", theme.progressBg)}>
+                        <div className={cn("h-full rounded-full transition-all duration-1000 relative", theme.progressBar)} style={{ width: `${Math.min((salesCount / nextMilestone.sales_target) * 100, 100)}%` }}>
+                          <div className={cn("absolute right-0 top-0 h-full w-1 group-hover/metric:animate-pulse", theme.progressBar)} />
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="group/metric">
-                    <div className="flex justify-between items-end mb-2">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-100/70">Revenue Target</span>
-                      <span className="text-lg font-black text-white">₹{Math.round(revenueCount / 100000)}L <span className="text-indigo-300 font-bold text-xs">/ {Math.round(nextMilestone.revenue_target / 100000)}L</span></span>
-                    </div>
-                    <div className="h-2 bg-indigo-900/40 rounded-full overflow-hidden p-0.5 backdrop-blur-sm relative">
-                      <div className="h-full bg-emerald-400 rounded-full transition-all duration-1000 shadow-[0_0_8px_rgba(52,211,153,0.5)] relative" style={{ width: `${Math.min((revenueCount / nextMilestone.revenue_target) * 100, 100)}%` }}>
-                        <div className="absolute right-0 top-0 h-full w-1 bg-white group-hover/metric:animate-pulse" />
+                  {nextMilestone.revenue_target > 0 && (
+                    <div className="group/metric">
+                      <div className="flex justify-between items-end mb-2">
+                        <span className={cn("text-[11px] font-bold uppercase tracking-wider", theme.textSecondary)}>Revenue Target</span>
+                        <span className="text-lg font-black text-inherit">₹{Math.round(revenueCount / 100000)}L <span className={cn("font-bold text-xs", theme.textSecondary)}>/ {Math.round(nextMilestone.revenue_target / 100000)}L</span></span>
+                      </div>
+                      <div className={cn("h-2 rounded-full overflow-hidden p-0.5 backdrop-blur-sm relative", theme.progressBg)}>
+                        <div className={cn("h-full rounded-full transition-all duration-1000 relative", theme.progressBar)} style={{ width: `${Math.min((revenueCount / nextMilestone.revenue_target) * 100, 100)}%` }}>
+                          <div className={cn("absolute right-0 top-0 h-full w-1 bg-white group-hover/metric:animate-pulse")} />
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
                 
-                <div className="mt-6 pt-4 border-t border-indigo-500/30 flex items-center gap-3">
-                  <div className="p-1.5 bg-white/10 rounded-lg">
+                <div className={cn("mt-6 pt-4 border-t flex items-center gap-3", theme.card.includes('from-indigo') ? 'border-indigo-400/30' : 'border-black/5')}>
+                  <div className={cn("p-1.5 rounded-lg", theme.accent)}>
                     <Zap className="w-3.5 h-3.5 text-amber-300" />
                   </div>
-                  <p className="text-[11px] font-medium italic text-indigo-100 leading-tight">
+                  <p className={cn("text-[11px] font-medium italic leading-tight", theme.textSecondary)}>
                     "{achievementData?.config?.quote || 'Consistency is the playground of the foundation of the champion.'}"
                   </p>
                 </div>
@@ -381,9 +455,8 @@ export function SalesDashboard() {
               <div className="mb-4">
                 <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 pl-1">Achievements & Badges</h4>
                 <div className="flex flex-wrap gap-2">
-                  {/* Local badges or from DB? Let's show from DB if available, otherwise defaults */}
                   {milestones.length > 0 ? milestones.map((m, idx) => {
-                    const isUnlocked = salesCount >= m.sales_target && revenueCount >= m.revenue_target;
+                    const isUnlocked = isMilestoneCompleted(m);
                     return (
                       <div key={idx} className={cn(
                         "flex items-center gap-2 px-3 py-2 rounded-xl border transition-all cursor-default group/badge relative",
@@ -400,10 +473,14 @@ export function SalesDashboard() {
                         </div>
                         <div>
                           <div className="text-[10px] font-bold text-slate-900 leading-none">{m.name}</div>
-                          <div className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">{m.sales_target} Sales</div>
+                          <div className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter">
+                            {m.sales_target > 0 && `${m.sales_target} Sales`}
+                            {m.sales_target > 0 && m.revenue_target > 0 && ' + '}
+                            {m.revenue_target > 0 && `₹${Math.round(m.revenue_target / 100000)}L`}
+                          </div>
                         </div>
                         <div className="hidden group-hover/badge:block absolute -top-10 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[9px] px-2 py-1 rounded shadow-xl whitespace-nowrap z-50">
-                          Targets: {m.sales_target} Sales / ₹{Math.round(m.revenue_target / 100000)}L
+                          Targets: {m.sales_target > 0 ? `${m.sales_target} Sales` : ''} {m.sales_target > 0 && m.revenue_target > 0 ? '/' : ''} {m.revenue_target > 0 ? `₹${Math.round(m.revenue_target / 100000)}L` : ''}
                         </div>
                       </div>
                     );
