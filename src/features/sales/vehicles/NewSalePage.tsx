@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Car, 
@@ -9,7 +9,9 @@ import {
   ChevronRight, 
   CheckCircle2,
   Layers,
-  Settings2
+  Settings2,
+  AlertCircle,
+  User as UserIcon
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -37,6 +39,7 @@ import { useToast } from '@/hooks/useToast';
 import { useFormDirtyNavigation } from '@/hooks/useFormDirtyNavigation';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { getVariantsForSale, checkVehicleNumberUnique, createVehicleSale } from '@/lib/db/vehicles';
+import { getPreBooking } from '@/lib/db/preBookings';
 import { getTenantCatalogConfig } from '@/lib/db/catalogV2';
 import { searchCustomers, checkPhoneDuplicate, createCustomer } from '@/lib/db/customers';
 import { SpecDisplay } from '@/components/catalog/SpecDisplay';
@@ -57,12 +60,24 @@ const MODEL_IMAGES: Record<string, string> = {
 export function NewSalePage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const preBooking = location.state?.preBooking;
+  const [searchParams] = useSearchParams();
+  const preBookingId = searchParams.get('preBookingId');
+  const preBookingFromState = location.state?.preBooking;
+
   const { user, tenantId } = useAuthStore(s => ({ user: s.user!, tenantId: s.user!.tenantId! }));
   const { showToast } = useToast();
   const queryClient = useQueryClient();
 
-  const [step, setStep] = useState(preBooking ? 2 : 1);
+  // Fetch pre-booking if ID present
+  const { data: fetchedPreBooking, isLoading: isFetchingPreBooking } = useQuery({
+    queryKey: ['pre_booking', preBookingId, tenantId],
+    queryFn: () => getPreBooking(preBookingId!, tenantId!),
+    enabled: !!preBookingId && !!tenantId,
+  });
+
+  const activePreBooking = fetchedPreBooking || preBookingFromState;
+
+  const [step, setStep] = useState(activePreBooking ? 2 : 1);
   const [selectionStep, setSelectionStep] = useState(1); // 1: Category, 2: Manufacturer, 3: Model, 4: Variant
   
   const [recordedSale, setRecordedSale] = useState<any>(null);
@@ -71,18 +86,38 @@ export function NewSalePage() {
   const [selectedCategory, setSelectedCategory] = useState<any>(null);
   const [selectedManufacturer, setSelectedManufacturer] = useState<string | null>(null);
   const [selectedModel, setSelectedModel] = useState<any>(null);
-  const [selectedVariant, setSelectedVariant] = useState<any>(preBooking?.variant || null);
+  const [selectedVariant, setSelectedVariant] = useState<any>(activePreBooking?.variant || null);
   const [selectedColor, setSelectedColor] = useState<any>(null);
 
   useEffect(() => {
-    if (preBooking) {
-      if (preBooking.customer) setSelectedCustomer(preBooking.customer);
-      if (preBooking.colour_preference && preBooking.variant?.specs?.colour_options) {
-        const color = preBooking.variant.specs.colour_options.find((c: any) => c.name === preBooking.colour_preference);
+    if (activePreBooking) {
+      if (activePreBooking.customer) setSelectedCustomer(activePreBooking.customer);
+      if (activePreBooking.variant) {
+        setSelectedVariant(activePreBooking.variant);
+        if (activePreBooking.variant.model) {
+          setSelectedModel(activePreBooking.variant.model);
+          setSelectedManufacturer(activePreBooking.variant.model.manufacturer);
+          if (activePreBooking.variant.model.category) {
+            setSelectedCategory(activePreBooking.variant.model.category);
+          } else {
+            // Fallback for UI if category missing from pre-booking data
+            setSelectedCategory({ name: 'Vehicle', slug: 'vehicle' });
+          }
+        }
+      }
+      
+      if (activePreBooking.inventory_unit?.chassis_number) {
+        setChassisNumber(activePreBooking.inventory_unit.chassis_number);
+      }
+      
+      if (activePreBooking.colour_preference && activePreBooking.variant?.specs?.colour_options) {
+        const color = activePreBooking.variant.specs.colour_options.find((c: any) => c.name === activePreBooking.colour_preference);
         if (color) setSelectedColor(color);
       }
+      
+      if (step === 1) setStep(2);
     }
-  }, [preBooking]);
+  }, [activePreBooking]);
 
   // Step 2: Vehicle
   const [vehicleNumber, setVehicleNumber] = useState('');
@@ -95,7 +130,7 @@ export function NewSalePage() {
   // Step 3: Customer
   const [customerMode, setCustomerMode] = useState<'select' | 'new'>('select');
   const [customerSearch, setCustomerSearch] = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(preBooking?.customer || null);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(activePreBooking?.customer || null);
   const debouncedCustomerSearch = useDebounce(customerSearch, 300);
   
   // New Customer Form
@@ -110,8 +145,8 @@ export function NewSalePage() {
   // Form dirty state for navigation protection
   const isActuallyDirty = useMemo(() => {
     if (recordedSale) return false;
-    return !!selectedCategory || !!vehicleNumber || (selectedCustomer && !preBooking) || !!newCustName || !!selectedModel || (selectedVariant && !preBooking);
-  }, [recordedSale, selectedCategory, vehicleNumber, selectedCustomer, newCustName, selectedModel, selectedVariant, preBooking]);
+    return !!selectedCategory || !!vehicleNumber || (selectedCustomer && !activePreBooking) || !!newCustName || !!selectedModel || (selectedVariant && !activePreBooking);
+  }, [recordedSale, selectedCategory, vehicleNumber, selectedCustomer, newCustName, selectedModel, selectedVariant, activePreBooking]);
 
   const { 
     shouldShowDialog, 
@@ -217,21 +252,27 @@ export function NewSalePage() {
         variant_id: selectedVariant.id,
         customer_id: selectedCustomer.id,
         status: 'active'
-      }, selectedOptionalFeatures, tenantId, user.id, preBooking?.id);
+      }, selectedOptionalFeatures, tenantId, user.id, activePreBooking?.id);
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['vehicles'] });
-      if (preBooking) queryClient.invalidateQueries({ queryKey: ['pre_bookings_all'] });
+      if (activePreBooking) queryClient.invalidateQueries({ queryKey: ['pre_bookings_all'] });
       
       const vehicle = data.vehicle || { id: data.vehicleId };
       if (!vehicle.id && data.id) vehicle.id = data.id; // defensive
       
+      if (activePreBooking) {
+        showToast('Sale recorded and pre-booking closed.', 'success');
+        navigate(`/sales/vehicles/${vehicle.id}`);
+        return;
+      }
+
       setRecordedSale({ 
         ...vehicle, 
         tracking: `VLM-${Math.random().toString(36).substring(2, 9).toUpperCase()}` 
       });
       celebrate();
-      showToast(preBooking ? 'Pre-booking successfully converted to Sale!' : 'Sale recorded successfully', 'success');
+      showToast('Sale recorded successfully', 'success');
     },
     onError: (err: any) => showToast(err.message, 'error')
   });
@@ -261,13 +302,13 @@ export function NewSalePage() {
   };
 
   const manufacturers = useMemo<string[]>(() => {
-    if (!selectedCategory) return [];
+    if (!selectedCategory || !selectedCategory.models) return [];
     const set = new Set<string>(selectedCategory.models.map((m: any) => m.manufacturer));
     return Array.from(set).sort();
   }, [selectedCategory]);
 
   const filteredModels = useMemo<any[]>(() => {
-    if (!selectedManufacturer) return [];
+    if (!selectedManufacturer || !selectedCategory?.models) return [];
     return selectedCategory.models.filter((m: any) => m.manufacturer === selectedManufacturer);
   }, [selectedCategory, selectedManufacturer]);
 
@@ -289,10 +330,47 @@ export function NewSalePage() {
     setSelectionStep(level);
   };
 
+  if (preBookingId && isFetchingPreBooking) {
+    return (
+      <PageWrapper title="Record New Sale" backLink={{ label: 'Vehicles', path: '/sales/vehicles' }}>
+        <div className="max-w-4xl mx-auto pb-20 animate-pulse">
+           <div className="h-8 w-64 bg-slate-100 rounded mb-8" />
+           <div className="h-32 bg-slate-100 rounded mb-8" />
+           <div className="h-96 bg-slate-100 rounded" />
+        </div>
+      </PageWrapper>
+    );
+  }
+
+  if (preBookingId && !fetchedPreBooking && !isFetchingPreBooking) {
+    return (
+      <PageWrapper title="Record New Sale" backLink={{ label: 'Vehicles', path: '/sales/vehicles' }}>
+        <div className="max-w-md mx-auto py-20 text-center">
+          <div className="w-16 h-16 bg-red-50 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Pre-booking not found</h2>
+          <p className="text-slate-500 mb-6">The requested pre-booking does not exist or you don't have access to it.</p>
+          <Button variant="secondary" onClick={() => navigate('/sales/pre-bookings')}>Back to Pre-bookings</Button>
+        </div>
+      </PageWrapper>
+    );
+  }
+
   return (
     <PageWrapper title="Record New Sale" backLink={{ label: 'Vehicles', path: '/sales/vehicles' }}>
       <div className="max-w-4xl mx-auto pb-20">
         
+        {activePreBooking && (
+          <div className="mb-6 bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-indigo-600 mt-0.5" />
+            <div>
+              <div className="text-sm font-bold text-indigo-900">Converting pre-booking to sale</div>
+              <p className="text-xs text-indigo-700 mt-0.5">Customer and variant details are pre-filled from pre-booking #{activePreBooking.id.slice(0,8)} and cannot be changed.</p>
+            </div>
+          </div>
+        )}
+
         {/* Stepper */}
         <div className="mb-8">
           <div className="flex items-center justify-between relative">
@@ -314,8 +392,40 @@ export function NewSalePage() {
           </div>
         </div>
 
+        {/* Step 1: Conversion Summary (Read-only) */}
+        {step === 1 && activePreBooking && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <Card className="p-8 border-none shadow-sm bg-indigo-50/30">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-3xl bg-indigo-100 flex items-center justify-center text-indigo-600">
+                    <Car className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-indigo-500 uppercase tracking-widest mb-1">Pre-booked Variant</p>
+                    <h3 className="text-lg font-bold text-slate-900">{activePreBooking.variant?.name}</h3>
+                    <p className="text-sm text-slate-500">{activePreBooking.customer?.name}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Booking Date</p>
+                  <p className="text-sm font-bold text-slate-900">{new Date(activePreBooking.booking_date).toLocaleDateString()}</p>
+                  <p className="text-[10px] text-slate-400 mt-0.5 font-bold uppercase tracking-widest px-2 py-0.5 bg-white/50 rounded w-fit ml-auto">Status: {activePreBooking.status.replace('_', ' ')}</p>
+                </div>
+              </div>
+            </Card>
+            
+            <div className="flex justify-end pt-4">
+              <Button size="lg" className="px-8 shadow-lg shadow-indigo-100" onClick={() => setStep(2)}>
+                Continue to Details
+                <ChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Step 1: Selection Flow */}
-        {step === 1 && (
+        {step === 1 && !activePreBooking && (
           <div className="space-y-8 pb-10">
             {/* 1. Category Selection */}
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -464,7 +574,7 @@ export function NewSalePage() {
                   <h2 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Select Variant</h2>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {selectedModel.variants.map((v: any) => {
+                  {selectedModel.variants?.map((v: any) => {
                     const isSelected = selectedVariant?.id === v.id;
                     return (
                       <div
@@ -517,8 +627,8 @@ export function NewSalePage() {
                         <div className="flex flex-wrap gap-x-12 gap-y-6">
                           <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Model</p>
-                            <p className="text-sm font-bold text-slate-900 uppercase">{selectedModel.name}</p>
-                            <p className="text-[10px] text-slate-500 mt-0.5 uppercase">{selectedManufacturer}</p>
+                            <p className="text-sm font-bold text-slate-900 uppercase">{selectedModel?.name || 'N/A'}</p>
+                            <p className="text-[10px] text-slate-500 mt-0.5 uppercase">{selectedManufacturer || 'N/A'}</p>
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Variant</p>
@@ -593,14 +703,14 @@ export function NewSalePage() {
                             </div>
                             <div className="bg-slate-50/50 rounded-2xl border border-slate-100 p-4">
                               <SpecDisplay
-                                categorySlug={selectedCategory.slug}
-                                subcategorySlug={selectedModel.subcategory}
-                                powertrainSlug={selectedVariant.powertrain.slug}
+                                categorySlug={selectedCategory?.slug || 'vehicle'}
+                                subcategorySlug={selectedModel?.subcategory || ''}
+                                powertrainSlug={selectedVariant?.powertrain?.slug || ''}
                                 specs={Object.fromEntries(
                                   Object.entries({
-                                    ...selectedVariant.specs,
-                                    warranty: `${selectedVariant.warranty_vehicle_yrs} Years`,
-                                    model_year: selectedVariant.specs?.model_year || '2026'
+                                    ...selectedVariant?.specs,
+                                    warranty: `${selectedVariant?.warranty_vehicle_yrs || 0} Years`,
+                                    model_year: selectedVariant?.specs?.model_year || '2026'
                                   }).filter(([key]) => key !== 'colour_options' && key !== 'manufacturer')
                                 )}
                                 compact={true}
@@ -680,7 +790,30 @@ export function NewSalePage() {
         {step === 3 && (
           <div className="space-y-6">
             <Card className="p-6">
-              <div className="flex bg-slate-100 p-1 rounded-md w-fit mb-6 mx-auto">
+              {activePreBooking ? (
+                <div className="max-w-xl mx-auto py-6">
+                    <div className="p-6 border border-indigo-200 bg-indigo-50 rounded-2xl">
+                      <div className="flex items-center gap-4 mb-6">
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-100 flex items-center justify-center text-indigo-600">
+                          <UserIcon className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <div className="text-lg font-bold text-slate-900 leading-none mb-1">{activePreBooking.customer?.name}</div>
+                          <div className="text-xs text-slate-500 font-medium">{activePreBooking.customer?.phone}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="neutral" className="capitalize text-[10px] font-bold tracking-widest px-2 h-6">{activePreBooking.customer?.customer_type?.replace('_',' ') || 'CUSTOMER'}</Badge>
+                        <Badge variant="success" className="text-[10px] font-bold tracking-widest px-2 h-6">VERIFIED FROM BOOKING</Badge>
+                      </div>
+                      <p className="mt-8 text-[10px] font-bold text-indigo-400 italic uppercase tracking-wider">
+                        Note: Customer details are immutable for pre-booking conversions.
+                      </p>
+                    </div>
+                </div>
+              ) : (
+                <>
+                  <div className="flex bg-slate-100 p-1 rounded-md w-fit mb-6 mx-auto">
                 <button
                   onClick={() => setCustomerMode('select')}
                   className={`px-4 py-2 text-sm font-medium rounded transition-colors ${customerMode === 'select' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'}`}
@@ -804,7 +937,9 @@ export function NewSalePage() {
                   </div>
                 )}
               </div>
-            </Card>
+            </>
+          )}
+        </Card>
           </div>
         )}
 
@@ -862,7 +997,7 @@ export function NewSalePage() {
                 <div>
                   <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Vehicle Details</h3>
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between"><span className="text-slate-500">Variant</span><span className="font-medium">{selectedVariant.name}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Variant</span><span className="font-medium">{selectedVariant?.name || 'N/A'}</span></div>
                     {selectedColor && (
                       <div className="flex justify-between">
                         <span className="text-slate-500">Color</span>
@@ -872,8 +1007,8 @@ export function NewSalePage() {
                         </div>
                       </div>
                     )}
-                    <div className="flex justify-between"><span className="text-slate-500">Model</span><span className="font-medium">{selectedModel.manufacturer} {selectedModel.name}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Powertrain</span><span className="font-medium">{selectedVariant.powertrain.display_label}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Model</span><span className="font-medium">{selectedModel?.manufacturer || ''} {selectedModel?.name || 'N/A'}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Powertrain</span><span className="font-medium">{selectedVariant?.powertrain?.display_label || 'N/A'}</span></div>
                     <div className="flex justify-between"><span className="text-slate-500">Vehicle No.</span><span className="font-mono font-medium">{vehicleNumber}</span></div>
                     <div className="flex justify-between"><span className="text-slate-500">Sale Date</span><span className="font-medium">{new Date(saleDate).toLocaleDateString()}</span></div>
                   </div>
@@ -881,9 +1016,9 @@ export function NewSalePage() {
                 <div>
                   <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Customer</h3>
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between"><span className="text-slate-500">Name</span><span className="font-medium">{selectedCustomer.name}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Phone</span><span className="font-medium">{selectedCustomer.phone}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Type</span><span className="font-medium capitalize">{selectedCustomer.customer_type.replace('_',' ')}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Name</span><span className="font-medium">{selectedCustomer?.name || 'N/A'}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Phone</span><span className="font-medium">{selectedCustomer?.phone || 'N/A'}</span></div>
+                    <div className="flex justify-between"><span className="text-slate-500">Type</span><span className="font-medium capitalize">{selectedCustomer?.customer_type?.replace('_',' ') || 'N/A'}</span></div>
                   </div>
                 </div>
               </div>

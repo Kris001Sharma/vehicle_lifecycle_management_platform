@@ -476,3 +476,40 @@ export async function getVehiclesDueForService(tenantId: string, _withinDays: nu
     return new Date(a.last_service_date).getTime() - new Date(b.last_service_date).getTime();
   });
 }
+
+export async function linkPreBookingToVehicle(
+  preBookingId: string,
+  vehicleId: string,
+  tenantId: string
+) {
+  const { data, error } = await (supabase as any)
+    .from('pre_bookings')
+    .update({
+      vehicle_id: vehicleId,
+      status: 'delivered',
+      actual_delivery_date: new Date().toISOString().split('T')[0]
+    })
+    .eq('id', preBookingId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function linkInventoryUnitToVehicle(
+  unitId: string,
+  tenantId: string
+) {
+  const { data, error } = await (supabase as any)
+    .from('inventory_units')
+    .update({ status: 'sold' })
+    .eq('id', unitId)
+    .eq('tenant_id', tenantId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}

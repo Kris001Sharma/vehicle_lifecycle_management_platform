@@ -63,9 +63,17 @@ export async function getPreBooking(bookingId: string, tenantId: string) {
     .select(`
       *,
       customer:customers(name, phone, customer_type),
-      variant:vehicle_variants(name, specs),
-      model:vehicle_variants(model:vehicle_models(manufacturer, name, category:vehicle_categories(name))),
-      powertrain:vehicle_variants(powertrain:powertrain_types(display_label)),
+      variant:vehicle_variants (
+        id,
+        name,
+        specs,
+        price,
+        warranty_vehicle_yrs,
+        model:vehicle_models (
+          manufacturer, name, subcategory, category:vehicle_categories (id, name, slug)
+        ),
+        powertrain:powertrain_types (id, slug, display_label)
+      ),
       inventory_unit:inventory_units(chassis_number, colour, condition)
     `)
     .eq('id', bookingId)
@@ -85,9 +93,17 @@ export async function getPreBookingsByCustomer(customerId: string, tenantId: str
     .select(`
       *,
       customer:customers(name, phone, customer_type),
-      variant:vehicle_variants(name, specs),
-      model:vehicle_variants(model:vehicle_models(manufacturer, name, category:vehicle_categories(name))),
-      powertrain:vehicle_variants(powertrain:powertrain_types(display_label)),
+      variant:vehicle_variants (
+        id,
+        name,
+        specs,
+        price,
+        warranty_vehicle_yrs,
+        model:vehicle_models (
+          manufacturer, name, subcategory, category:vehicle_categories (id, name, slug)
+        ),
+        powertrain:powertrain_types (id, slug, display_label)
+      ),
       inventory_unit:inventory_units(chassis_number, colour, condition)
     `)
     .eq('customer_id', customerId)

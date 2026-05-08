@@ -183,7 +183,7 @@ export function PreBookingsPage() {
                   <div className="mt-3 flex justify-end gap-2 items-center" onClick={(e) => e.stopPropagation()}>
                     {pb.status === 'ordered' && (
                       <Link 
-                        to={`/sales/vehicles/new`} 
+                        to={`/sales/vehicles/new?preBookingId=${pb.id}`}
                         state={{ preBooking: pb }}
                       >
                         <Button 
@@ -287,7 +287,7 @@ export function PreBookingsPage() {
                         <div className="flex gap-2 justify-end items-center">
                           {pb.status === 'ordered' && (
                             <Link 
-                              to={`/sales/vehicles/new`} 
+                              to={`/sales/vehicles/new?preBookingId=${pb.id}`} 
                               state={{ preBooking: pb }}
                             >
                               <Button 

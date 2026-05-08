@@ -15,7 +15,7 @@ import { PreBookingFormModal } from '../pre-bookings/PreBookingFormModal';
 import { PreBookingStatusModal } from '../pre-bookings/PreBookingStatusModal';
 import { CommunicationLogModal } from '../communications/CommunicationLogModal';
 import { useToast } from '@/hooks/useToast';
-import { Phone, MessageSquare, Mail, Building, User, FileText, Settings2 } from 'lucide-react';
+import { Phone, MessageSquare, Mail, Building, User, FileText, Settings2, Search, CheckCircle2, ShoppingCart, Truck, Package, Clock } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
 export function CustomerDetailPage() {
@@ -108,6 +108,27 @@ export function CustomerDetailPage() {
       case 'cancelled': return 'error';
       default: return 'neutral';
     }
+  };
+
+  const milestones = [
+    { status: 'enquiry', label: 'Enquiry', icon: Search },
+    { status: 'confirmed', label: 'Confirmed', sub: 'Deposit Paid', icon: CheckCircle2 },
+    { status: 'ordered', label: 'Ordered', icon: ShoppingCart },
+    { status: 'in_transit', label: 'In Transit', icon: Truck },
+    { status: 'delivered', label: 'Delivered', icon: Package }
+  ];
+
+  const getMilestoneTimestamp = (pb: any, status: string) => {
+    if (status === 'enquiry') return new Date(pb.created_at).toLocaleString();
+    if (!communications) return null;
+    
+    const statusUpper = status.toUpperCase();
+    const log = [...communications].reverse().find(c => 
+      c.pre_booking_id === pb.id && 
+      c.notes?.includes(`Status moved to ${statusUpper}`)
+    );
+    
+    return log ? new Date(log.logged_at).toLocaleString() : null;
   };
 
   const hasActivePreBooking = preBookings?.some((pb: any) => !['delivered', 'cancelled'].includes(pb.status));
@@ -280,109 +301,203 @@ export function CustomerDetailPage() {
                 <Button variant="secondary" onClick={() => setIsPreBookingModalOpen(true)}>+ Create pre-booking</Button>
               </div>
             ) : (
-              <div className="grid gap-4">
-                {preBookings.map((pb: any) => (
-                  <Card key={pb.id} className="p-6">
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4 border-b border-slate-100 pb-4">
-                      <div>
-                        <h3 className="font-bold text-lg">{pb.variant?.name}</h3>
-                        <div className="text-sm text-slate-500">Booking date: {new Date(pb.booking_date).toLocaleDateString()}</div>
-                      </div>
-                      <Badge variant={getStatusColor(pb.status) as any} className="w-fit text-sm capitalize">{pb.status.replace('_', ' ')}</Badge>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                      <div className="space-y-3">
-                        {pb.expected_delivery_date && (
-                          <div className="text-sm">
-                            <span className="text-slate-500 block mb-0.5">Expected delivery</span>
-                            <span className="font-medium">{new Date(pb.expected_delivery_date).toLocaleDateString()}</span>
-                          </div>
-                        )}
-                        {pb.colour_preference && (
-                          <div className="text-sm">
-                            <span className="text-slate-500 block mb-0.5">Colour preference</span>
-                            <div className="flex items-center gap-2">
-                              {(() => {
-                                const opt = pb.variant?.specs?.colour_options?.find((o: any) => o.name === pb.colour_preference);
-                                if (opt) {
-                                  return (
-                                    <>
-                                      <div 
-                                        className="w-3 h-3 rounded-full border border-slate-200" 
-                                        style={{ backgroundColor: opt.hex }} 
-                                      />
-                                      <span className="font-medium">{pb.colour_preference}</span>
-                                    </>
-                                  );
-                                }
-                                return <span className="font-medium">{pb.colour_preference}</span>;
-                              })()}
+              <div className="grid gap-6">
+                {preBookings.map((pb: any) => {
+                  const currentStatusIndex = milestones.findIndex(m => m.status === pb.status);
+                  const isCancelled = pb.status === 'cancelled';
+
+                  return (
+                    <Card key={pb.id} className="overflow-hidden border-slate-200/60 shadow-sm">
+                      {/* Card Header (Vehicle Details) */}
+                      <div className="p-5 border-b border-slate-100 bg-slate-50/30">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-bold text-lg text-slate-900">{pb.variant?.name}</h3>
+                              <Badge variant={getStatusColor(pb.status) as any} className="capitalize py-0 px-2 h-5 text-[10px] font-bold uppercase tracking-widest leading-none">
+                                {pb.status.replace('_', ' ')}
+                              </Badge>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500 font-medium">
+                              <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Booked: {new Date(pb.booking_date).toLocaleDateString()}</span>
+                              {pb.expected_delivery_date && (
+                                <span className="flex items-center gap-1.5"><Truck className="w-3.5 h-3.5" /> Expected: {new Date(pb.expected_delivery_date).toLocaleDateString()}</span>
+                              )}
                             </div>
                           </div>
-                        )}
-                        {pb.special_requirements && (
-                          <div className="text-sm">
-                            <span className="text-slate-500 block mb-0.5">Special requirements</span>
-                            <span className="font-medium line-clamp-2">{pb.special_requirements}</span>
-                          </div>
-                        )}
-                        {pb.inventory_unit && (
-                          <div className="p-3 bg-slate-50 rounded text-sm">
-                            <span className="font-medium block mb-1">Assigned Unit</span>
-                            <span className="text-slate-600 block">Chassis: {pb.inventory_unit.chassis_number || 'N/A'}</span>
-                            <span className="text-slate-600 block capitalize">Condition: {pb.inventory_unit.condition}</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {financeEnabled && (
-                        <div className="space-y-3 p-4 bg-indigo-50/50 rounded-lg">
-                          <h4 className="text-xs font-bold uppercase tracking-wider text-indigo-800 mb-2">Finance details</h4>
-                          <div className="text-sm">
-                            <span className="text-slate-500 block mb-0.5">Deposit</span>
-                            <Badge variant={pb.deposit_received ? 'success' : 'neutral'} className="mr-2">
-                              {pb.deposit_received ? 'Received' : 'Not received'}
-                            </Badge>
-                            {pb.deposit_amount && <span className="font-medium ml-2">${pb.deposit_amount.toLocaleString()}</span>}
-                          </div>
-                          {pb.finance_type && (
-                            <div className="text-sm text-slate-700">
-                              Type: <span className="font-medium capitalize">{pb.finance_type.replace('_', ' ')}</span>
-                            </div>
-                          )}
-                          {pb.finance_company && (
-                            <div className="text-sm text-slate-700">
-                              Company: <span className="font-medium">{pb.finance_company}</span>
+                          
+                          {pb.inventory_unit && (
+                            <div className="px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg shrink-0">
+                               <div className="text-[10px] font-black uppercase tracking-wider text-indigo-400 leading-none mb-1">Assigned Unit</div>
+                               <div className="text-xs font-bold text-indigo-900 font-mono tracking-tight">{pb.inventory_unit.chassis_number}</div>
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex gap-2 justify-end pt-4 border-t border-slate-100">
-                      {pb.status === 'ordered' && (
-                        <Button 
-                          size="sm" 
-                          variant="secondary"
-                          className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100"
-                          onClick={() => navigate(`/sales/vehicles/new`, { state: { preBooking: pb } })}
-                        >
-                          Convert to sale →
-                        </Button>
-                      )}
-                      {!['delivered', 'cancelled'].includes(pb.status) && (
-                        <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => setStatusModalBooking({ ...pb, action: 'cancel' })}>Cancel booking</Button>
-                      )}
-                      {pb.status !== 'cancelled' && pb.status !== 'delivered' && (
-                        <Button variant="secondary" size="sm" onClick={() => setStatusModalBooking({ ...pb, action: 'update' })}>
-                          <Settings2 className="w-3.5 h-3.5 mr-1.5" />
-                          Change Status
-                        </Button>
-                      )}
-                    </div>
-                  </Card>
-                ))}
+                      </div>
+
+                      <div className="p-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                          {/* Stepper (Milestones) */}
+                          <div className="lg:col-span-7">
+                            <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 mb-6">Booking Journey</h4>
+                            <div className="relative space-y-0">
+                              {milestones.map((milestone, idx) => {
+                                const timestamp = getMilestoneTimestamp(pb, milestone.status);
+                                const isCompleted = idx <= currentStatusIndex && !isCancelled;
+                                const isCurrent = idx === currentStatusIndex && !isCancelled;
+                                const showLine = idx < milestones.length - 1;
+
+                                return (
+                                  <div key={milestone.status} className="relative flex gap-4 min-h-[64px]">
+                                    {showLine && (
+                                      <div className={cn(
+                                        "absolute left-[15px] top-[30px] bottom-[-10px] w-[2px]",
+                                        isCompleted ? "bg-indigo-500" : "bg-slate-100"
+                                      )} />
+                                    )}
+
+                                    <div className={cn(
+                                      "z-10 w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-transform duration-300",
+                                      isCompleted ? "bg-indigo-600 text-white shadow-lg shadow-indigo-200" : "bg-slate-100 text-slate-400",
+                                      isCurrent && "scale-110 ring-4 ring-indigo-50"
+                                    )}>
+                                      <milestone.icon className="w-4 h-4" />
+                                    </div>
+
+                                    <div className="pb-8">
+                                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                                        <div className={cn(
+                                          "text-sm font-bold tracking-tight",
+                                          isCompleted ? "text-slate-900" : "text-slate-400"
+                                        )}>
+                                          {milestone.label}
+                                          {milestone.sub && milestone.status === 'confirmed' && pb.deposit_received && (
+                                            <span className="ml-1 text-emerald-600">({milestone.sub})</span>
+                                          )}
+                                        </div>
+                                        {timestamp && (
+                                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wide bg-slate-50 px-1.5 py-0.5 rounded">
+                                            {timestamp}
+                                          </div>
+                                        )}
+                                      </div>
+                                      {isCurrent && (
+                                        <div className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-indigo-600 animate-pulse">
+                                          <div className="w-2 h-2 rounded-full bg-indigo-600" />
+                                          Currently here
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+
+                              {isCancelled && (
+                                <div className="absolute inset-0 bg-white/40 backdrop-blur-[1px] flex items-center justify-center rounded-xl">
+                                  <div className="bg-red-50 text-red-600 px-4 py-2 rounded-lg border border-red-100 font-bold flex items-center gap-2 shadow-sm">
+                                    <div className="w-2 h-2 rounded-full bg-red-600 animate-ping" />
+                                    Booking Cancelled
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Details Sidebar in Card */}
+                          <div className="lg:col-span-5 space-y-6">
+                            {(pb.colour_preference || pb.special_requirements) && (
+                              <div className="space-y-4">
+                                {pb.colour_preference && (
+                                  <div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Colour Preference</span>
+                                    <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                      {(() => {
+                                        const opt = pb.variant?.specs?.colour_options?.find((o: any) => o.name === pb.colour_preference);
+                                        return opt && (
+                                          <div className="w-4 h-4 rounded-full border border-slate-200 shadow-sm" style={{ backgroundColor: opt.hex }} />
+                                        );
+                                      })()}
+                                      <span className="text-sm font-bold text-slate-700">{pb.colour_preference}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                {pb.special_requirements && (
+                                  <div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Instructions</span>
+                                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-sm text-slate-600 font-medium italic">
+                                      "{pb.special_requirements}"
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {financeEnabled && (
+                              <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100">
+                                <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-4">Finance & Deposit</h4>
+                                <div className="space-y-3">
+                                  <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-indigo-100/50">
+                                    <span className="text-xs font-bold text-slate-500">Deposit Status</span>
+                                    <Badge variant={pb.deposit_received ? 'success' : 'neutral'} className="h-6 font-bold">
+                                      {pb.deposit_received ? 'Paid' : 'Pending'}
+                                    </Badge>
+                                  </div>
+                                  {pb.deposit_amount && (
+                                    <div className="flex justify-between items-center bg-white p-2.5 rounded-xl border border-indigo-100/50">
+                                      <span className="text-xs font-bold text-slate-500">Amount</span>
+                                      <span className="text-sm font-black text-indigo-900">${pb.deposit_amount.toLocaleString()}</span>
+                                    </div>
+                                  )}
+                                  {pb.finance_type && (
+                                    <div className="flex justify-between items-center px-1">
+                                      <span className="text-[10px] font-bold text-indigo-300 uppercase">Method</span>
+                                      <span className="text-xs font-bold text-indigo-800 capitalize">{pb.finance_type.replace('_', ' ')}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Card Footer (Actions) */}
+                      <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex flex-wrap gap-2 justify-end items-center">
+                        {pb.status === 'ordered' && (
+                          <Button 
+                            size="sm" 
+                            variant="secondary"
+                            className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-100 font-bold uppercase tracking-widest text-[9px] h-9 px-4 sm:flex-1 md:flex-none"
+                            onClick={() => navigate(`/sales/vehicles/new`, { state: { preBooking: pb } })}
+                          >
+                            Convert to sale →
+                          </Button>
+                        )}
+                        {!['delivered', 'cancelled'].includes(pb.status) && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50 font-bold uppercase tracking-widest text-[9px] h-9 px-4 sm:flex-1 md:flex-none" 
+                            onClick={() => setStatusModalBooking({ ...pb, action: 'cancel' })}
+                          >
+                            Cancel
+                          </Button>
+                        )}
+                        {!['delivered', 'cancelled'].includes(pb.status) && (
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            className="font-bold uppercase tracking-widest text-[9px] h-9 px-4 sm:flex-1 md:flex-none"
+                            onClick={() => setStatusModalBooking({ ...pb, action: 'update' })}
+                          >
+                            <Settings2 className="w-3.5 h-3.5 mr-1.5" />
+                            Update Status
+                          </Button>
+                        )}
+                      </div>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </div>
