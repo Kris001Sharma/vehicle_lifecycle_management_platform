@@ -458,8 +458,7 @@ export async function getVehiclesDueForService(tenantId: string, _withinDays: nu
     .from('vehicles')
     .select(`
       id, vehicle_number, last_service_date,
-      model:vehicle_models(name, manufacturer),
-      variant:vehicle_variants(powertrain:powertrain_types(display_label)),
+      variant:vehicle_variants(powertrain:powertrain_types(display_label), model:vehicle_models(name, manufacturer)),
       customer:customers(name, phone)
     `)
     .eq('tenant_id', tenantId)
@@ -469,7 +468,10 @@ export async function getVehiclesDueForService(tenantId: string, _withinDays: nu
 
   if (error) throw error;
 
-  return data.sort((a: any, b: any) => {
+  return data.map((v: any) => ({
+    ...v,
+    model: v.variant?.model,
+  })).sort((a: any, b: any) => {
     if (!a.last_service_date && !b.last_service_date) return 0;
     if (!a.last_service_date) return 1;
     if (!b.last_service_date) return -1;

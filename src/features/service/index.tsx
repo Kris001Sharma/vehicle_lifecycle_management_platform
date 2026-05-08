@@ -1,26 +1,22 @@
 import { useState } from 'react';
-import { useLocation } from 'react-router-dom';
-import { PageWrapper } from '@/components/layout/PageWrapper';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { Card } from '@/components/ui/Card';
-import { Skeleton } from '@/components/ui/Skeleton';
-import { LayoutDashboard, Search, Wrench, History, Menu, X } from 'lucide-react';
-import { ComponentErrorBoundary } from '@/components/errors/ComponentErrorBoundary';
+import { LayoutDashboard, Wrench, History, Menu, X } from 'lucide-react';
+import { ServiceDashboard } from './ServiceDashboard';
+import { JobCardsPage } from './JobCardsPage';
+
+import { JobCardFormPage, JobCardEditPage } from './JobCardPages';
+import { HistoryPage } from './HistoryPage';
+
+import { VehicleServicePage } from './VehicleServicePage';
 
 const SERVICE_NAV = [
   { label: 'Dashboard', path: '/service', icon: LayoutDashboard },
-  { label: 'Search Vehicle', path: '/service/search', icon: Search },
-  { label: 'Job Cards', path: '/service/jobs', icon: Wrench },
+  { label: 'Job Cards', path: '/service/job-cards', icon: Wrench },
   { label: 'History', path: '/service/history', icon: History },
 ];
 
-// Placeholders for future components
-const VehicleSearchPanel = () => <div className="p-4 border border-dashed text-gray-400">Vehicle search panel placeholder</div>;
-const JobCardForm = () => <div className="p-4 border border-dashed text-gray-400">Job card form placeholder</div>;
-const ArchiveRehydrationPanel = () => <div className="p-4 border border-dashed text-gray-400">Archive rehydration panel placeholder</div>;
-const FileUploader = () => <div className="p-4 border border-dashed text-gray-400">File uploader placeholder</div>;
-
-export default function ServiceDashboard() {
+export default function ServicePortal() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
@@ -51,40 +47,14 @@ export default function ServiceDashboard() {
       </div>
 
       <div className="flex-1 w-0 overflow-y-auto bg-slate-50 relative pt-14 md:pt-0" onClick={() => mobileMenuOpen && setMobileMenuOpen(false)}>
-        <PageWrapper title="Service Dashboard">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-8">
-            <Card title="Active Jobs" className="p-5 border-slate-200 shadow-sm">
-              <Skeleton className="h-10 w-24 mb-2" />
-              <Skeleton className="h-4 w-32" />
-            </Card>
-            <Card title="Pending Diagnostics" className="p-5 border-slate-200 shadow-sm">
-              <Skeleton className="h-10 w-24 mb-2" />
-              <Skeleton className="h-4 w-32" />
-            </Card>
-            <Card title="Completed Today" className="p-5 border-slate-200 shadow-sm">
-              <Skeleton className="h-10 w-24 mb-2" />
-              <Skeleton className="h-4 w-32" />
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <ComponentErrorBoundary componentName="Vehicle search panel">
-              <VehicleSearchPanel />
-            </ComponentErrorBoundary>
-            
-            <ComponentErrorBoundary componentName="Job card form">
-              <JobCardForm />
-            </ComponentErrorBoundary>
-            
-            <ComponentErrorBoundary componentName="Archive rehydration panel">
-              <ArchiveRehydrationPanel />
-            </ComponentErrorBoundary>
-            
-            <ComponentErrorBoundary componentName="File uploader">
-              <FileUploader />
-            </ComponentErrorBoundary>
-          </div>
-        </PageWrapper>
+        <Routes>
+          <Route path="/" element={<ServiceDashboard />} />
+          <Route path="/job-cards" element={<JobCardsPage />} />
+          <Route path="/history" element={<HistoryPage />} />
+          <Route path="/vehicle/:vehicleId" element={<VehicleServicePage />} />
+          <Route path="/vehicle/:vehicleId/job-card/new" element={<JobCardFormPage />} />
+          <Route path="/job-card/:recordId/edit" element={<JobCardEditPage />} />
+        </Routes>
       </div>
     </div>
   );
