@@ -414,13 +414,6 @@ export function NewSalePage() {
                 </div>
               </div>
             </Card>
-            
-            <div className="flex justify-end pt-4">
-              <Button size="lg" className="px-8 shadow-lg shadow-indigo-100" onClick={() => setStep(2)}>
-                Continue to Details
-                <ChevronRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
           </div>
         )}
 

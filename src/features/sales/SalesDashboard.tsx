@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card } from '@/components/ui/Card';
@@ -14,6 +15,7 @@ import { getDashboardTrends } from '@/lib/db/dashboard';
 import { useToast } from '@/hooks/useToast';
 import { Phone, MessageSquare, Mail, Building, User, FileText, TrendingUp, TrendingDown, CheckCircle2, Clock, Zap, Award, Target, Trophy, IndianRupee } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { motion, AnimatePresence } from 'motion/react';
 
 export function SalesDashboard() {
   const navigate = useNavigate();
@@ -37,6 +39,15 @@ export function SalesDashboard() {
     queryFn: () => getDashboardTrends(tenantId!),
     enabled: !!tenantId,
   });
+
+  const [period, setPeriod] = useState<'week' | 'month'>('week');
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setPeriod(prev => prev === 'week' ? 'month' : 'week');
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
 
   const { data: recentSales, isLoading: recentLoading } = useQuery({
     queryKey: ['sales_recent', tenantId],
@@ -156,8 +167,8 @@ export function SalesDashboard() {
   const leads = allPreBookings?.filter((pb: any) => ['enquiry', 'confirmed'].includes(pb.status)) || [];
   const awaitingDelivery = allPreBookings?.filter((pb: any) => ['ordered', 'in_transit'].includes(pb.status)) || [];
 
-  const salesCount = trends?.salesCurrent || 0;
-  const revenueCount = trends?.revenueCurrent || 0;
+  const salesCount = trends?.sales?.current || 0;
+  const revenueCount = trends?.revenue?.current || 0;
   const milestones = (achievementData?.milestones || []) as any[];
   
   const isMilestoneCompleted = (m: any) => {
@@ -235,9 +246,10 @@ export function SalesDashboard() {
 
   const theme = getMilestoneTheme(nextMilestone.badge_color || 'amber');
   
-  const renderKPI = (title: string, value: number | string, icon: React.ReactNode, trend?: number, link?: string, loading?: boolean) => {
-    const isPositive = trend && trend > 0;
-    const isNegative = trend && trend < 0;
+  const renderKPI = (title: string, value: number | string, icon: React.ReactNode, trend?: { week: number; month: number }, link?: string, loading?: boolean) => {
+    const currentTrend = trend ? trend[period] : 0;
+    const isPositive = currentTrend > 0;
+    const isNegative = currentTrend < 0;
     
     const content = (
       <Card className="p-6 border border-slate-100 shadow-sm relative overflow-hidden group hover:border-indigo-100 hover:shadow-md transition-all h-full flex flex-col justify-between">
@@ -253,12 +265,24 @@ export function SalesDashboard() {
           <div className="flex items-baseline gap-3">
              {loading ? <Skeleton className="h-10 w-16" /> : <div className="text-4xl font-bold text-slate-900 tracking-tight">{value}</div>}
              {!loading && trend !== undefined && (
-               <div className={cn(
-                 "flex items-center gap-0.5 text-xs font-bold px-1.5 py-0.5 rounded",
-                 isPositive ? "text-emerald-700 bg-emerald-50" : isNegative ? "text-red-700 bg-red-50" : "text-slate-600 bg-slate-100"
-               )}>
-                 {isPositive ? <TrendingUp className="w-3 h-3" /> : isNegative ? <TrendingDown className="w-3 h-3" /> : null}
-                 {Math.abs(trend)}{trend > 10 ? '%' : ''}
+               <div className="h-6 overflow-hidden">
+                 <AnimatePresence mode="wait">
+                   <motion.div
+                     key={period}
+                     initial={{ y: 20, opacity: 0 }}
+                     animate={{ y: 0, opacity: 1 }}
+                     exit={{ y: -20, opacity: 0 }}
+                     transition={{ duration: 0.4, ease: "circOut" }}
+                     className={cn(
+                       "flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap",
+                       isPositive ? "text-emerald-700 bg-emerald-50" : isNegative ? "text-red-700 bg-red-50" : "text-slate-600 bg-slate-100"
+                     )}
+                   >
+                     {isPositive ? <TrendingUp className="w-2.5 h-2.5" /> : isNegative ? <TrendingDown className="w-2.5 h-2.5" /> : null}
+                     <span>{Math.abs(currentTrend)}%</span>
+                     <span className="opacity-70">{isPositive ? 'up' : isNegative ? 'down' : ''} this {period}</span>
+                   </motion.div>
+                 </AnimatePresence>
                </div>
              )}
           </div>
@@ -305,8 +329,8 @@ export function SalesDashboard() {
 
         {/* KPIs */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
-          {renderKPI("Total Customers", stats?.customers || 0, <User />, trends?.customerTrend, "/sales/customers", statsLoading || trendsLoading)}
-          {renderKPI("Leads / Inquiries", leads.length, <Zap />, trends?.leadsTrend, "/sales/pre-bookings", pbLoading || trendsLoading)}
+          {renderKPI("Total Customers", stats?.customers || 0, <User />, trends?.customers, "/sales/customers", statsLoading || trendsLoading)}
+          {renderKPI("Leads / Inquiries", leads.length, <Zap />, trends?.leads, "/sales/pre-bookings", pbLoading || trendsLoading)}
           {renderKPI("Active Inventory", inventoryStats?.in_stock || 0, <Building />, undefined, "/sales/inventory", invLoading)}
           {renderKPI("Awaiting Delivery", awaitingDelivery.length, <Clock />, undefined, "/sales/pre-bookings", pbLoading)}
         </div>
