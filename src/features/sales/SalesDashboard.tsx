@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useAuthStore } from '@/features/auth/store/authStore';
 import { supabase } from '@/lib/supabase/client';
-import { getInventorySummary } from '@/lib/db/inventory';
+import { getInventorySummary, getAgingInventory } from '@/lib/db/inventory';
 import { getPreBookings } from '@/lib/db/preBookings';
 import { getCriticalFollowUps, markFollowUpDone } from '@/lib/db/communications';
 import { getDashboardTrends } from '@/lib/db/dashboard';
@@ -73,6 +73,12 @@ export function SalesDashboard() {
   const { data: inventoryStats, isLoading: invLoading } = useQuery({
     queryKey: ['inventory_summary', tenantId],
     queryFn: () => getInventorySummary(tenantId!),
+    enabled: !!tenantId,
+  });
+
+  const { data: agingInventory, isLoading: agingLoading } = useQuery({
+    queryKey: ['inventory_aging', tenantId],
+    queryFn: () => getAgingInventory(tenantId!, 60),
     enabled: !!tenantId,
   });
 
@@ -642,7 +648,71 @@ export function SalesDashboard() {
               </div>
             </section>
 
-
+            {/* Stock Aging Analytics */}
+            <section>
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2 mb-4">
+                <Building className="w-5 h-5 text-rose-500" />
+                Stock Aging Alerts
+              </h2>
+              <Card className="border border-slate-100 shadow-sm overflow-hidden rounded-2xl relative">
+                <div className="absolute top-0 right-0 w-20 h-20 bg-rose-50 rounded-full blur-2xl -translate-y-1/2 translate-x-1/3" />
+                
+                <div className="p-4 border-b border-slate-50 flex justify-between items-center bg-white relative">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Capital at Risk</h3>
+                    <p className="text-[10px] uppercase font-bold tracking-widest text-slate-400 mt-0.5">Vehicles parked {'>'} 60 days</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xl font-black text-rose-600">{agingInventory?.length || 0}</p>
+                    <p className="text-[9px] uppercase font-bold tracking-widest text-slate-400 mt-0.5">Units</p>
+                  </div>
+                </div>
+                
+                <div className="divide-y divide-slate-50 bg-white relative">
+                  {agingLoading ? (
+                    <div className="p-4 space-y-3">
+                       <Skeleton className="h-10 w-full" />
+                       <Skeleton className="h-10 w-full" />
+                    </div>
+                  ) : agingInventory && agingInventory.length > 0 ? (
+                    agingInventory.slice(0, 3).map((unit: any) => (
+                      <div key={unit.id} className="p-4 hover:bg-rose-50/30 transition-colors">
+                        <div className="flex justify-between items-start mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-900 text-sm truncate max-w-[150px]">{unit.variant?.model?.manufacturer} {unit.variant?.name}</span>
+                            {unit.daysInStock > 90 && <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />}
+                          </div>
+                          <span className={cn("text-xs font-bold", unit.daysInStock > 90 ? "text-rose-600" : "text-amber-600")}>
+                            {unit.daysInStock} Days
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 mb-2 truncate">VIN: {unit.vehicle_number || unit.chassis_number || 'N/A'}</p>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Button variant="secondary" size="sm" className="flex-1 text-[9px] uppercase font-bold tracking-wider py-1" onClick={() => navigate(`/sales/inventory/${unit.id}`)}>
+                            Inspect Unit
+                          </Button>
+                          <Button variant="destructive" size="sm" className="flex-1 text-[9px] uppercase font-bold tracking-wider py-1 bg-rose-50 text-rose-700 hover:bg-rose-100 border-none">
+                            Add Discount
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-8 text-center bg-white">
+                       <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                       <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Inventory is healthy</p>
+                       <p className="text-[10px] text-slate-400 mt-1">No units aged over 60 days.</p>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="bg-slate-50 p-3 text-center border-t border-slate-100">
+                  <Link to="/sales/inventory" className="text-xs font-bold text-indigo-600 uppercase tracking-widest hover:text-indigo-700">
+                    View Full Inventory
+                  </Link>
+                </div>
+              </Card>
+            </section>
           </div>
           
         </div>

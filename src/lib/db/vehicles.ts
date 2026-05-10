@@ -132,13 +132,29 @@ export async function createVehicleSale(
   userId: string,
   preBookingId?: string
 ) {
-  // 1. Re-check vehicle_number uniqueness server-side
+  // 1. Governance Check: Ensure variant is active for sale
+  const { data: variant, error: varError } = await (supabase as any)
+    .from('vehicle_variants')
+    .select('id, availability_status, service_interval_months, service_interval_km')
+    .eq('id', saleData.variant_id)
+    .single();
+
+  if (varError || !variant) {
+    throw new Error('VARIANT_NOT_FOUND');
+  }
+
+  if ((variant as any).availability_status === 'DISCONTINUED') {
+    return { error: 'VARIANT_DISCONTINUED' };
+  }
+
+  // 2. Re-check vehicle_number uniqueness server-side
   const isUnique = await checkVehicleNumberUnique(saleData.vehicle_number, tenantId);
   if (!isUnique) {
     return { error: 'VEHICLE_NUMBER_TAKEN' };
   }
 
-  // 2. Insert vehicle row
+  // 3. Insert vehicle row
+  // Note: sale_date is treated as the Handover Date
   const { data: vehicle, error: vehicleError } = await (supabase as any)
     .from('vehicles')
     .insert(Object.assign({}, saleData || {}, { tenant_id: tenantId }))
@@ -150,7 +166,7 @@ export async function createVehicleSale(
   }
 
   try {
-    // 3. Update Pre-booking if converting
+    // 4. Update Pre-booking if converting
     if (preBookingId) {
       // First get the pre_booking to check if an inventory unit is attached
        const { data: pbData } = await (supabase as any)
@@ -164,7 +180,7 @@ export async function createVehicleSale(
         .update({ 
           status: 'delivered', 
           vehicle_id: vehicle.id, 
-          actual_delivery_date: new Date().toISOString().split('T')[0] 
+          actual_delivery_date: saleData.sale_date // Use the handover date from the sale
         })
         .eq('id', preBookingId);
         
@@ -174,6 +190,27 @@ export async function createVehicleSale(
            .update({ status: 'sold' })
            .eq('id', pbData.inventory_unit_id);
       }
+    }
+
+    // 5. Service Bridge: Auto-calculate first service
+    if ((variant as any).service_interval_months || (variant as any).service_interval_km) {
+      const saleDateObj = new Date(saleData.sale_date);
+      const nextDate = new Date(saleDateObj);
+      if ((variant as any).service_interval_months) {
+        nextDate.setMonth(nextDate.getMonth() + (variant as any).service_interval_months);
+      }
+
+      await (supabase as any)
+        .from('service_records')
+        .insert({
+          tenant_id: tenantId,
+          vehicle_id: vehicle.id,
+          visit_date: nextDate.toISOString().split('T')[0], // Projected date
+          visit_type: 'routine',
+          status: 'open', // This marks it as a "Scheduled" or "CRM Lead"
+          complaint: 'First free service (Auto-scheduled from Sale Handover)',
+          next_service_date: nextDate.toISOString().split('T')[0]
+        });
     }
 
     // Try to find a matching inventory unit by vehicle number and link it
@@ -246,7 +283,8 @@ export async function getVehicleWithFullDetails(vehicleId: string, tenantId: str
     .from('vehicles')
     .select(`
       id, vehicle_number, chassis_number, registration_plate, sale_date, 
-      last_service_date, status, is_archived, sale_notes, total_service_count,
+      last_service_date, status, is_archived, customer_id, sale_notes, total_service_count,
+      has_amc, amc_years, amc_package_id, handover_ritual_completed, warranty_certificate_no,
       variant:vehicle_variants (
         id, name, specs, status, powertrain_type_id,
         service_interval_km, service_interval_months,
@@ -320,7 +358,7 @@ export async function searchVehicles(
     .from('vehicles')
     .select(`
       id, vehicle_number, chassis_number, registration_plate, sale_date, 
-      last_service_date, status, is_archived,
+      last_service_date, status, is_archived, customer_id,
       variant:vehicle_variants (
         name,
         service_interval_months,

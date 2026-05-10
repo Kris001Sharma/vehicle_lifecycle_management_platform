@@ -226,10 +226,6 @@ export async function getOpenJobCards(tenantId: string) {
     return [];
   }
 
-  if (data && data.length > 50) {
-    console.warn(`High volume of open job cards: ${data.length}`);
-  }
-
   return (data || []).map((card: any) => ({
     ...card,
     vehicle: {
@@ -237,4 +233,72 @@ export async function getOpenJobCards(tenantId: string) {
       model: card.vehicle?.variant?.model
     }
   }));
+}
+
+export async function getServiceDashboardStats(tenantId: string) {
+  // 1. Get open cards for current load
+  const { count: openCount } = await supabase
+    .from('service_records')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+    .eq('status', 'open');
+
+  // 2. Get completed cards for turnover calculation (last 30 days)
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  
+  const { data: recentCompleted } = await supabase
+    .from('service_records')
+    .select('created_at, updated_at')
+    .eq('tenant_id', tenantId)
+    .eq('status', 'completed')
+    .gte('updated_at', thirtyDaysAgo.toISOString());
+
+  let avgTurnaroundHours = 2.4; // Default/Target
+  if (recentCompleted && recentCompleted.length > 0) {
+    const totalHours = recentCompleted.reduce((acc, rec) => {
+      const created = new Date(rec.created_at);
+      const updated = new Date(rec.updated_at);
+      return acc + (updated.getTime() - created.getTime()) / (1000 * 60 * 60);
+    }, 0);
+    avgTurnaroundHours = totalHours / recentCompleted.length;
+  }
+
+  // 3. Get predictive count (vehicles with no service in last 6 months or due soon)
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  
+  const { count: predictiveCount } = await supabase
+    .from('vehicles')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+    .eq('status', 'active')
+    .or(`last_service_date.is.null,last_service_date.lt.${sixMonthsAgo.toISOString().split('T')[0]}`);
+
+  return {
+    activeBays: openCount || 0,
+    avgTurnaround: avgTurnaroundHours.toFixed(1),
+    predictiveAlerts: predictiveCount || 0,
+    approvalsPending: 3 // Mocked for now until we add approval tracking
+  };
+}
+
+export async function getServiceActionCenter(tenantId: string) {
+  // Fetch open cards to categorize them for the action center
+  const openCards = await getOpenJobCards(tenantId);
+  
+  const blockedJobs = openCards.filter(c => 
+    (c.complaint?.toLowerCase().includes('pending') || c.diagnosis?.toLowerCase().includes('wait')) ||
+    (c.complaint?.toLowerCase().includes('block') || c.diagnosis?.toLowerCase().includes('parts'))
+  ).slice(0, 5);
+
+  const today = new Date().toISOString().split('T')[0];
+  const deliveriesDue = openCards.filter(c => 
+    c.visit_date === today
+  ).slice(0, 5);
+
+  return {
+    blockedJobs,
+    deliveriesDue
+  };
 }

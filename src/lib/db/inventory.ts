@@ -77,6 +77,46 @@ export async function getInventorySummary(tenantId: string) {
   return summary;
 }
 
+export async function getAgingInventory(tenantId: string, daysThreshold: number = 60) {
+  const thresholdDate = new Date();
+  thresholdDate.setDate(thresholdDate.getDate() - daysThreshold);
+  
+  const { data, error } = await supabase
+    .from('inventory_units')
+    .select(`
+      id,
+      chassis_number,
+      received_date,
+      created_at,
+      status,
+      variant:vehicle_variants(
+        name,
+        model:vehicle_models(name, manufacturer)
+      )
+    `)
+    .eq('tenant_id', tenantId)
+    .eq('status', 'in_stock')
+    .or(`received_date.lt.${thresholdDate.toISOString().split('T')[0]},received_date.is.null`)
+    .order('received_date', { ascending: true });
+
+  if (error) {
+    console.error("Error fetching aging inventory:", error);
+    return [];
+  }
+
+  // Calculate days in stock
+  return (data || []).map((unit: any) => {
+    const received = unit.received_date ? new Date(unit.received_date) : new Date(unit.created_at);
+    const diffTime = Math.abs(new Date().getTime() - received.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return {
+      ...unit,
+      daysInStock: diffDays
+    };
+  }).filter(u => u.daysInStock >= daysThreshold);
+}
+
 export async function createInventoryUnit(unitData: any, tenantId: string, userId: string) {
   const { data: variant, error: variantError } = await (supabase as any)
     .from('vehicle_variants')

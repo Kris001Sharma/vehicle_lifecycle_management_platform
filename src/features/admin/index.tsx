@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { LayoutDashboard, PackageSearch, Users, Settings, History, Menu, X } from 'lucide-react';
+import { LayoutDashboard, PackageSearch, Users, Settings, History, Menu, X, ShieldCheck } from 'lucide-react';
 import { AuditLogPage } from './AuditLogPage';
 import { UserListPage } from './UserListPage';
 import { CatalogPage } from './catalog/CatalogPage';
@@ -12,6 +12,7 @@ import { VariantFormV2 } from './catalog/VariantFormV2';
 import { ModelFormPage } from './catalog/ModelFormPage';
 import { CatalogSettingsPage } from './settings/CatalogSettingsPage';
 import { AchievementSettingsPage } from './settings/AchievementSettingsPage';
+import { WorkflowSettingsPage } from './settings/WorkflowSettingsPage';
 
 const ADMIN_NAV = [
   { label: 'Dashboard', path: '/admin', icon: LayoutDashboard },
@@ -32,11 +33,13 @@ const ADMIN_NAV = [
     children: [
         { label: 'Catalog Settings', path: '/admin/settings/catalog' },
         { label: 'Achievement Settings', path: '/admin/settings/achievements' },
+        { label: 'Handover Governance', path: '/admin/settings/workflow' },
     ]
   },
 ];
 
 function AdminDashboardContent() {
+  const navigate = useNavigate();
   return (
     <PageWrapper title="Admin Dashboard">
       <div className="max-w-7xl mx-auto">
@@ -52,6 +55,21 @@ function AdminDashboardContent() {
           <Card title="System Alerts" className="p-5 border-slate-200 shadow-sm">
             <Skeleton className="h-10 w-24 mb-2" />
             <Skeleton className="h-4 w-32" />
+          </Card>
+          <Card 
+            title="Handover Setup" 
+            className="p-5 border-indigo-100 bg-indigo-50/10 shadow-sm cursor-pointer hover:shadow-md transition-all group"
+            onClick={() => navigate('/admin/settings/workflow')}
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-100 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                <ShieldCheck className="w-5 h-5 text-indigo-600" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-indigo-600 uppercase tracking-widest">Workflow</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">Configure delivery rituals</p>
+              </div>
+            </div>
           </Card>
         </div>
       </div>
@@ -102,6 +120,7 @@ export default function AdminDashboard() {
           <Route path="/settings" element={<Navigate to="/admin/settings/catalog" replace />} />
           <Route path="/settings/catalog" element={<CatalogSettingsPage />} />
           <Route path="/settings/achievements" element={<AchievementSettingsPage />} />
+          <Route path="/settings/workflow" element={<WorkflowSettingsPage />} />
         </Routes>
       </div>
     </div>

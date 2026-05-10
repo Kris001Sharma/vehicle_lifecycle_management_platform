@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { PageWrapper } from '@/components/layout/PageWrapper';
@@ -15,8 +15,34 @@ import { PreBookingFormModal } from '../pre-bookings/PreBookingFormModal';
 import { PreBookingStatusModal } from '../pre-bookings/PreBookingStatusModal';
 import { CommunicationLogModal } from '../communications/CommunicationLogModal';
 import { useToast } from '@/hooks/useToast';
-import { Phone, MessageSquare, Mail, Building, User, FileText, Settings2, Search, CheckCircle2, ShoppingCart, Truck, Package, Clock } from 'lucide-react';
+import { 
+  Phone, 
+  MessageSquare, 
+  Mail, 
+  Building, 
+  User, 
+  FileText, 
+  Settings2, 
+  Search, 
+  CheckCircle2, 
+  ShoppingCart, 
+  Truck, 
+  Package, 
+  Clock,
+  Archive,
+  Eye,
+  AlertCircle,
+  Upload
+} from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { supabase } from '@/lib/supabase/client';
+
+const REQUIRED_DOC_TYPES = ['registration', 'insurance', 'id_proof'];
+const DOC_LABELS: Record<string, string> = {
+  registration: 'Registration Paper',
+  insurance: 'Insurance Cover',
+  id_proof: 'Citizenship / ID Proof'
+};
 
 export function CustomerDetailPage() {
   const { customerId } = useParams();
@@ -28,13 +54,7 @@ export function CustomerDetailPage() {
   const financeEnabled = useFinanceEnabled();
 
   const tabParam = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState<'overview' | 'pre-bookings' | 'communications'>('overview');
-
-  useEffect(() => {
-    if (tabParam === 'pre-bookings' || tabParam === 'communications' || tabParam === 'overview') {
-      setActiveTab(tabParam);
-    }
-  }, [tabParam]);
+  const [activeTab, setActiveTab] = useState<'overview' | 'pre-bookings' | 'communications' | 'documents'>('overview');
   const [isPreBookingModalOpen, setIsPreBookingModalOpen] = useState(false);
   const [isCommModalOpen, setIsCommModalOpen] = useState(false);
   const [statusModalBooking, setStatusModalBooking] = useState<any | null>(null);
@@ -42,19 +62,46 @@ export function CustomerDetailPage() {
   const { data: customer, isLoading: isLoadingCustomer, error: customerError } = useQuery({
     queryKey: ['customer', customerId, tenantId],
     queryFn: () => getCustomerById(customerId!, tenantId!),
-    enabled: !!tenantId && !!customerId,
+    enabled: !!tenantId && tenantId !== 'undefined' && !!customerId && customerId !== 'undefined',
   });
 
   const { data: preBookings, isLoading: isLoadingPreBookings } = useQuery({
     queryKey: ['pre_bookings', customerId, tenantId],
     queryFn: () => getPreBookingsByCustomer(customerId!, tenantId!),
-    enabled: !!tenantId && !!customerId,
+    enabled: !!tenantId && tenantId !== 'undefined' && !!customerId && customerId !== 'undefined',
   });
 
   const { data: communications, isLoading: isLoadingComms } = useQuery({
     queryKey: ['communications', customerId, tenantId],
     queryFn: () => getCommunications(customerId!, tenantId!),
-    enabled: !!tenantId && !!customerId,
+    enabled: !!tenantId && tenantId !== 'undefined' && !!customerId && customerId !== 'undefined',
+  });
+
+  const { data: workflowConfig } = useQuery({
+    queryKey: ['workflow_config', tenantId],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from('tenant_workflow_config')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .single();
+      return data;
+    },
+    enabled: !!tenantId
+  });
+
+  const { data: customerDocuments, refetch: refetchDocs } = useQuery({
+    queryKey: ['customer_documents', customerId, tenantId],
+    queryFn: async () => {
+      const { data } = await (supabase as any)
+        .from('customer_documents')
+        .select('*')
+        .eq('customer_id', customerId)
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false });
+      return data || [];
+    },
+    enabled: !!tenantId && tenantId !== 'undefined' && !!customerId && customerId !== 'undefined',
   });
 
   const markDoneMutation = useMutation({
@@ -65,6 +112,49 @@ export function CustomerDetailPage() {
       showToast('Marked as done', 'success');
     }
   });
+
+  const uploadDocMutation = useMutation({
+    mutationFn: async ({ type, file }: { type: string, file: File }) => {
+      const reader = new FileReader();
+      const p = new Promise<string>((resolve) => {
+        reader.onloadend = () => resolve(reader.result as string);
+      });
+      reader.readAsDataURL(file);
+      const base64Data = await p;
+
+      const { data, error } = await (supabase as any).from('customer_documents').insert({
+        tenant_id: tenantId,
+        customer_id: customerId,
+        doc_type: type,
+        file_name: file.name,
+        file_url: base64Data // Placeholder for actual storage URL
+      }).select().single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      refetchDocs();
+      showToast('Document uploaded successfully', 'success');
+    },
+    onError: (err: any) => {
+      showToast(err.message || 'Failed to upload document', 'error');
+    }
+  });
+
+  useEffect(() => {
+    if (tabParam === 'pre-bookings' || tabParam === 'communications' || tabParam === 'overview' || tabParam === 'documents') {
+      setActiveTab(tabParam as any);
+    }
+  }, [tabParam]);
+
+  const missingDocs = useMemo(() => {
+    if (!workflowConfig?.require_documents) return [];
+    const uploadedTypes = customerDocuments?.map((d: any) => d.doc_type) || [];
+    return REQUIRED_DOC_TYPES.filter(type => !uploadedTypes.includes(type));
+  }, [workflowConfig, customerDocuments]);
+
+  const hasMissingDocs = missingDocs.length > 0;
 
   if (isLoadingCustomer) {
     return (
@@ -144,7 +234,8 @@ export function CustomerDetailPage() {
           {[
             { id: 'overview', label: 'Overview', short: 'Info' },
             { id: 'pre-bookings', label: 'Pre Bookings', short: 'Bookings', indicator: hasActivePreBooking },
-            { id: 'communications', label: 'Communications', short: 'Timeline', indicator: hasActiveFollowUp }
+            { id: 'communications', label: 'Communications', short: 'Timeline', indicator: hasActiveFollowUp },
+            { id: 'documents', label: 'Vault', short: 'Docs', indicator: hasMissingDocs, indicatorVariant: 'error' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -162,7 +253,9 @@ export function CustomerDetailPage() {
                 {tab.indicator && (
                   <span className={cn(
                     "w-1.5 h-1.5 rounded-full",
-                    tab.id === 'pre-bookings' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+                    tab.id === 'pre-bookings' ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : 
+                    tab.indicatorVariant === 'error' ? "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" :
+                    "bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
                   )} />
                 )}
               </span>
@@ -649,6 +742,87 @@ export function CustomerDetailPage() {
                       </div>
                     </div>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'documents' && (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h2 className="text-xl font-bold text-slate-900 tracking-tight">Customer Vault</h2>
+                <p className="text-sm text-slate-500 mt-1">Archived documents and verification records</p>
+              </div>
+            </div>
+
+            {hasMissingDocs && (
+              <div className="bg-red-50 border border-red-100 rounded-2xl p-6">
+                <div className="flex items-start gap-4">
+                  <div className="p-2 bg-red-100 rounded-xl">
+                    <AlertCircle className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-red-900">Mandatory Documents Pending</h3>
+                    <p className="text-xs text-red-700 mt-1 mb-4 leading-relaxed">
+                      This customer has {missingDocs.length} required document{missingDocs.length > 1 ? 's' : ''} missing in their profile. Please upload them to maintain compliance.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                       {missingDocs.map(type => (
+                         <div key={type} className="bg-white p-3 rounded-xl border border-red-200 flex items-center justify-between group">
+                            <span className="text-xs font-bold text-slate-700">{DOC_LABELS[type]}</span>
+                            <label className="cursor-pointer p-1.5 hover:bg-slate-50 rounded-lg text-indigo-600 transition-colors">
+                               <Upload className="w-4 h-4" />
+                               <input 
+                                 type="file" 
+                                 className="hidden" 
+                                 onChange={(e) => {
+                                   const file = e.target.files?.[0];
+                                   if (file) uploadDocMutation.mutate({ type: type as string, file });
+                                 }}
+                               />
+                            </label>
+                         </div>
+                       ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!customerDocuments || customerDocuments.length === 0 ? (
+              <div className="text-center py-20 bg-slate-50/50 rounded-3xl border border-dashed border-slate-200">
+                <div className="w-16 h-16 bg-white rounded-2xl shadow-sm flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                  <Archive className="w-8 h-8 text-slate-300" />
+                </div>
+                <h3 className="text-base font-bold text-slate-900 mb-1">No documents found</h3>
+                <p className="text-sm text-slate-500 max-w-xs mx-auto">Documents uploaded during the handover ritual will appear here.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {customerDocuments.map((doc: any) => (
+                  <Card key={doc.id} className="p-4 group hover:border-indigo-300 hover:shadow-md transition-all">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                        <FileText className="w-6 h-6" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-black text-slate-400 capitalize tracking-widest leading-none mb-1">{doc.doc_type.replace('_',' ')}</p>
+                        <p className="text-sm font-bold text-slate-900 truncate">{doc.file_name || 'Verification Doc'}</p>
+                        <p className="text-[10px] text-slate-500 mt-1 uppercase font-medium">{new Date(doc.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <a 
+                        href={doc.file_url} 
+                        download={doc.file_name}
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                      >
+                        <Eye className="w-5 h-5" />
+                      </a>
+                    </div>
+                  </Card>
                 ))}
               </div>
             )}

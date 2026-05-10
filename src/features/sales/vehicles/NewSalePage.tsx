@@ -11,7 +11,17 @@ import {
   Layers,
   Settings2,
   AlertCircle,
-  User as UserIcon
+  User as UserIcon,
+  ShieldCheck,
+  FileText,
+  ClipboardCheck,
+  Trophy,
+  Upload,
+  Archive,
+  Droplets,
+  Fuel,
+  Info,
+  BadgePercent
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -77,10 +87,57 @@ export function NewSalePage() {
 
   const activePreBooking = fetchedPreBooking || preBookingFromState;
 
+  const { data: workflowConfig } = useQuery({
+    queryKey: ['workflow_config', tenantId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('tenant_workflow_config')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      return data || {
+        enable_pdi: true,
+        enable_document_verification: true,
+        enable_warranty_activation: true,
+        require_documents: true
+      };
+    },
+    enabled: !!tenantId,
+  });
+
+  const isHandoverActive = useMemo(() => {
+    return workflowConfig?.enable_pdi || workflowConfig?.enable_document_verification || workflowConfig?.enable_warranty_activation;
+  }, [workflowConfig]);
+
+  const totalSteps = isHandoverActive ? 5 : 4;
+
   const [step, setStep] = useState(activePreBooking ? 2 : 1);
   const [selectionStep, setSelectionStep] = useState(1); // 1: Category, 2: Manufacturer, 3: Model, 4: Variant
   
   const [recordedSale, setRecordedSale] = useState<any>(null);
+
+  // Handover Checklist State
+  const [pdiSteps, setPdiSteps] = useState({
+    fluid: false,
+    wipe: false,
+    walkthrough: false
+  });
+
+  const [documents, setDocuments] = useState<Record<string, { name: string, data: string }>>({});
+  const [selectedAmcId, setSelectedAmcId] = useState<string>('standard');
+  const [warrantyActivated, setWarrantyActivated] = useState(false);
+
+  // Derived checklist state for validation
+  const checklist = useMemo(() => {
+    const hasPdi = pdiSteps.fluid && pdiSteps.wipe && pdiSteps.walkthrough;
+    const hasRequiredDocs = !!(documents.registration && documents.insurance && documents.id_proof);
+    
+    return {
+      pdi: hasPdi,
+      docs: hasRequiredDocs,
+      warranty: warrantyActivated
+    };
+  }, [pdiSteps, documents, warrantyActivated]);
 
   // Selection State
   const [selectedCategory, setSelectedCategory] = useState<any>(null);
@@ -88,6 +145,62 @@ export function NewSalePage() {
   const [selectedModel, setSelectedModel] = useState<any>(null);
   const [selectedVariant, setSelectedVariant] = useState<any>(activePreBooking?.variant || null);
   const [selectedColor, setSelectedColor] = useState<any>(null);
+
+  const tcoProjection = useMemo(() => {
+    if (!selectedVariant) return null;
+    
+    const powertrain = selectedVariant.model?.powertrain?.type?.toLowerCase() || '';
+    const isEV = powertrain.includes('electric') || powertrain.includes('bev');
+    
+    // Monthly distance: 1250km (15,000km/yr)
+    // 5 Year horizon (Extended for better comparison)
+    const YEARS = 5;
+    const routineBasePerYear = 60000;
+    const wearBasePerYear = 40000;
+    const fuelBasePerYear = 180000; // Diesel benchmark
+
+    const routineTotalMarket = (isEV ? routineBasePerYear * 0.4 : routineBasePerYear) * YEARS;
+    const wearAndTearTotalMarket = (isEV ? wearBasePerYear * 0.7 : wearBasePerYear) * YEARS;
+    const dieselBenchmarkTotal = fuelBasePerYear * YEARS;
+    const energyTotal = isEV ? dieselBenchmarkTotal * 0.15 : dieselBenchmarkTotal;
+
+    // AMC Packages based on years of coverage
+    const amcPackages = [
+      { id: 'standard', years: 3, price: 0, label: 'Standard Warranty Only', desc: 'Factory coverage for 3 years' },
+      { id: 'silver', years: 4, price: routineTotalMarket * 0.5, label: 'Silver (+1 Year)', desc: 'Extended protection for 4 years' },
+      { id: 'gold', years: 5, price: routineTotalMarket * 0.65, label: 'Gold (+2 Years)', desc: 'Full coverage for 5 years' },
+      { id: 'platinum', years: 6, price: routineTotalMarket * 0.8, label: 'Platinum (+3 Years)', desc: 'Maximized 6-year peace of mind' },
+    ].map(pkg => ({
+      ...pkg,
+      savings: Math.max(0, ((routineTotalMarket / YEARS) * Math.min(pkg.years, YEARS)) - pkg.price)
+    }));
+
+    const currentAmc = amcPackages.find(p => p.id === selectedAmcId) || amcPackages[0];
+    
+    // Coverage logic: How much of the 5-year routine cost is covered by the package?
+    // routineTotalMarket is for 5 years. If package covers X years, covered amount is routineTotalMarket * (min(X, 5) / 5)
+    const coveredAmount = (routineTotalMarket / YEARS) * Math.min(currentAmc.years, YEARS);
+    const outOfPocketRoutine = routineTotalMarket - coveredAmount;
+    
+    // Savings calculation: (Market Rate for covered period) - Package Cost
+    const amcSavings = coveredAmount - currentAmc.price;
+
+    return {
+      routineMarket: routineTotalMarket,
+      routineOutOfPocket: outOfPocketRoutine,
+      wearAndTear: wearAndTearTotalMarket,
+      energy: energyTotal,
+      dieselBenchmark: dieselBenchmarkTotal,
+      totalMarket: routineTotalMarket + wearAndTearTotalMarket + energyTotal,
+      totalWithAmc: (currentAmc.price + outOfPocketRoutine) + wearAndTearTotalMarket + energyTotal,
+      evSavings: isEV ? dieselBenchmarkTotal - energyTotal : 0,
+      amcPackages,
+      currentAmc,
+      amcSavings,
+      isEV,
+      years: YEARS
+    };
+  }, [selectedVariant, selectedAmcId]);
 
   useEffect(() => {
     if (activePreBooking) {
@@ -124,6 +237,7 @@ export function NewSalePage() {
   const [chassisNumber, setChassisNumber] = useState('');
   const [registrationPlate, setRegistrationPlate] = useState('');
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
+  const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
   const [saleNotes, setSaleNotes] = useState('');
   const [vehicleNumberError, setVehicleNumberError] = useState('');
 
@@ -166,7 +280,7 @@ export function NewSalePage() {
 
   const { data: categoriesWithModels, isLoading: isCatalogLoading } = useQuery({
     queryKey: ['variants_for_sale', tenantId],
-    queryFn: () => getVariantsForSale(tenantId),
+    queryFn: () => getVariantsForSale(tenantId, { excludePreOrderOnly: true }),
     enabled: !!tenantId,
   });
 
@@ -241,18 +355,41 @@ export function NewSalePage() {
 
   const recordSaleMutation = useMutation({
     mutationFn: async () => {
-      return createVehicleSale({
+      // 1. Record the sale
+      const saleResult = await createVehicleSale({
         vehicle_number: vehicleNumber,
         chassis_number: chassisNumber,
         registration_plate: registrationPlate,
-        sale_date: saleDate,
+        sale_date: deliveryDate, 
         sale_notes: selectedColor 
-          ? `Selected Color: ${selectedColor.name} (${selectedColor.hex})\n${saleNotes}`
-          : saleNotes,
+          ? `Selected Color: ${selectedColor.name} (${selectedColor.hex})\nOriginal Sale Date: ${saleDate}\n${saleNotes}`
+          : `Original Sale Date: ${saleDate}\n${saleNotes}`,
         variant_id: selectedVariant.id,
         customer_id: selectedCustomer.id,
-        status: 'active'
+        status: 'active',
+        handover_ritual_completed: totalSteps === 5,
+        has_amc: selectedAmcId !== 'standard',
+        amc_years: tcoProjection?.currentAmc?.years,
+        amc_package_id: selectedAmcId,
+        warranty_certificate_no: warrantyActivated ? `W-${Math.random().toString(36).substring(2, 8).toUpperCase()}` : null
       }, selectedOptionalFeatures, tenantId, user.id, activePreBooking?.id);
+
+      // 2. Save documents to customer_documents (local/base64 for now)
+      if (Object.keys(documents).length > 0) {
+        const docPromises = Object.entries(documents).map(([type, doc]) => 
+          (supabase as any).from('customer_documents').insert({
+            tenant_id: tenantId,
+            customer_id: selectedCustomer.id,
+            doc_type: type,
+            file_name: doc.name,
+            file_url: doc.data,
+            metadata: { sale_id: (saleResult as any).vehicle?.id || (saleResult as any).id }
+          })
+        );
+        await Promise.all(docPromises);
+      }
+
+      return saleResult;
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['vehicles'] });
@@ -375,7 +512,12 @@ export function NewSalePage() {
         <div className="mb-8">
           <div className="flex items-center justify-between relative">
             <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-0.5 bg-slate-200 -z-10"></div>
-            {[1, 2, 3, 4].map(num => (
+            {Array.from({ length: totalSteps }).map((_, idx) => {
+              const num = idx + 1;
+              const labels = totalSteps === 5 
+                ? [ 'Variant', 'Details', 'Customer', 'Handover', 'Confirm' ]
+                : [ 'Variant', 'Details', 'Customer', 'Confirm' ];
+              return (
               <div key={num} className="flex flex-col items-center gap-2 bg-slate-50 px-2">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center font-medium text-sm transition-colors border-2 ${stepClasses(num)}`}>
                   {step > num ? (
@@ -384,11 +526,11 @@ export function NewSalePage() {
                     </svg>
                   ) : num}
                 </div>
-                <span className={`text-xs font-medium uppercase tracking-wider ${step >= num ? 'text-indigo-900' : 'text-slate-400'}`}>
-                  {num === 1 ? 'Variant' : num === 2 ? 'Details' : num === 3 ? 'Customer' : 'Confirm'}
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${step >= num ? 'text-indigo-900' : 'text-slate-400'}`}>
+                  {labels[idx]}
                 </span>
               </div>
-            ))}
+            );})}
           </div>
         </div>
 
@@ -755,15 +897,27 @@ export function NewSalePage() {
                     className="w-full px-3 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-indigo-500 font-mono"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Sale Date *</label>
-                  <input
-                    type="date"
-                    max={new Date().toISOString().split('T')[0]}
-                    value={saleDate}
-                    onChange={e => setSaleDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-indigo-500"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Sale Date *</label>
+                    <input
+                      type="date"
+                      max={new Date().toISOString().split('T')[0]}
+                      value={saleDate}
+                      onChange={e => setSaleDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Delivery & Handover Date *</label>
+                    <input
+                      type="date"
+                      value={deliveryDate}
+                      onChange={e => setDeliveryDate(e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-md focus:ring-2 focus:ring-indigo-500"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1">First service will be scheduled based on this date.</p>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Sale Notes (Optional)</label>
@@ -936,8 +1090,134 @@ export function NewSalePage() {
           </div>
         )}
 
-        {/* Step 4 */}
-        {step === 4 && (
+        {/* Step 4: Golden Handover Ritual (New Step) */}
+        {step === 4 && totalSteps === 5 && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="text-center max-w-xl mx-auto mb-8">
+              <div className="w-16 h-16 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-amber-100 shadow-sm">
+                 <Trophy className="w-8 h-8 text-amber-600" />
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tight">The Golden Handover</h2>
+              <p className="text-sm text-slate-500 mt-2 font-medium italic">Complete the delivery ritual for ${selectedCustomer?.name}</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="p-0 overflow-hidden border-slate-200">
+                <div className="bg-slate-50 p-4 border-b border-slate-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ClipboardCheck className="w-4 h-4 text-indigo-600" />
+                    <span className="font-bold text-slate-900 text-sm">Integrity Checklist</span>
+                  </div>
+                  {checklist.pdi && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                </div>
+                <div className="p-4 space-y-3">
+                  <HandoverCheckbox 
+                    label="Fluid levels & pressure checked" 
+                    checked={pdiSteps.fluid} 
+                    onToggle={() => setPdiSteps(s => ({ ...s, fluid: !s.fluid }))} 
+                  />
+                  <HandoverCheckbox 
+                    label="PDI wipe-down completed" 
+                    checked={pdiSteps.wipe} 
+                    onToggle={() => setPdiSteps(s => ({ ...s, wipe: !s.wipe }))} 
+                  />
+                  <HandoverCheckbox 
+                    label="Customer walkthrough done" 
+                    checked={pdiSteps.walkthrough} 
+                    onToggle={() => setPdiSteps(s => ({ ...s, walkthrough: !s.walkthrough }))} 
+                  />
+                </div>
+              </Card>
+
+              <Card className="p-0 overflow-hidden border-slate-200">
+                <div className="bg-slate-50 p-4 border-b border-slate-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-indigo-600" />
+                    <span className="font-bold text-slate-900 text-sm">Document Archive</span>
+                  </div>
+                  {checklist.docs && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                </div>
+                <div className="p-4 space-y-4">
+                  <DocumentUploader 
+                    label="Registration Paper" 
+                    type="registration" 
+                    required={workflowConfig?.require_documents}
+                    value={documents.registration} 
+                    onUpload={(f) => {
+                      const reader = new FileReader();
+                      reader.onloadend = () => setDocuments(d => ({ ...d, registration: { name: f.name, data: reader.result as string }}));
+                      reader.readAsDataURL(f);
+                    }}
+                  />
+                  <DocumentUploader 
+                    label="Insurance Cover" 
+                    type="insurance" 
+                    required={workflowConfig?.require_documents}
+                    value={documents.insurance} 
+                    onUpload={(f) => {
+                      const reader = new FileReader();
+                      reader.onloadend = () => setDocuments(d => ({ ...d, insurance: { name: f.name, data: reader.result as string }}));
+                      reader.readAsDataURL(f);
+                    }}
+                  />
+                  <DocumentUploader 
+                    label="Citizenship / ID Proof" 
+                    type="id_proof" 
+                    required={workflowConfig?.require_documents}
+                    value={documents.id_proof} 
+                    onUpload={(f) => {
+                      const reader = new FileReader();
+                      reader.onloadend = () => setDocuments(d => ({ ...d, id_proof: { name: f.name, data: reader.result as string }}));
+                      reader.readAsDataURL(f);
+                    }}
+                  />
+                </div>
+              </Card>
+            </div>
+
+            <Card className="p-6 border-amber-100 bg-amber-50/30">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <ShieldCheck className="w-6 h-6 text-amber-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900">Warranty Activation</h4>
+                    <p className="text-xs text-slate-500">Initiate digital warranty for {selectedVariant?.name}</p>
+                  </div>
+                </div>
+                {!warrantyActivated ? (
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    className="border-amber-600 text-amber-700 hover:bg-amber-100"
+                    onClick={() => {
+                      setWarrantyActivated(true);
+                      showToast('Warranty Activated Successfully', 'success');
+                    }}
+                  >
+                    Activate Now
+                  </Button>
+                ) : (
+                  <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 px-3 py-1">
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    ACTIVATED
+                  </Badge>
+                )}
+              </div>
+            </Card>
+
+            <div className="p-6 bg-indigo-50/50 rounded-2xl border border-indigo-100 flex items-center gap-3">
+              <div className="w-1.5 h-10 bg-indigo-600 rounded-full" />
+              <p className="text-xs text-indigo-900 font-medium leading-relaxed">
+                By completing the ritual, you automatically schedule the <strong>First Service Projection</strong> and initiate the customer loyalty cycle.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Final Summary (Old Step 4) */}
+        {((step === 4 && totalSteps === 4) || (step === 5)) && (
           <div className="space-y-6">
             <Card className="p-6">
               <h2 className="text-lg font-semibold text-slate-900 mb-2 border-b border-slate-100 pb-2">Optional add-on features</h2>
@@ -984,35 +1264,298 @@ export function NewSalePage() {
             </Card>
 
             <Card className="p-6">
-              <h2 className="text-lg font-semibold text-slate-900 mb-6">Sale Summary</h2>
+              <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+                <h2 className="text-lg font-black text-slate-900 tracking-tight">Final Sale Summary</h2>
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 bg-indigo-50 rounded-lg">
+                    <Car className="w-4 h-4 text-indigo-600" />
+                  </div>
+                  <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Digital Contract Draft</span>
+                </div>
+              </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
                 <div>
-                  <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Vehicle Details</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between"><span className="text-slate-500">Variant</span><span className="font-medium">{selectedVariant?.name || 'N/A'}</span></div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Vehicle Configuration</h3>
+                    <Badge variant="neutral" className="text-[9px] font-bold py-0.5">{selectedVariant?.model?.manufacturer}</Badge>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center group">
+                      <span className="text-xs font-medium text-slate-500 group-hover:text-slate-900 transition-colors">Variant</span>
+                      <span className="text-sm font-bold text-slate-900">{selectedVariant?.name || 'N/A'}</span>
+                    </div>
                     {selectedColor && (
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Color</span>
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 rounded-full border border-slate-200" style={{ backgroundColor: selectedColor.hex }} />
-                          <span className="font-medium">{selectedColor.name}</span>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-slate-500">Selected Color</span>
+                        <div className="flex items-center gap-2 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
+                          <div className="w-2.5 h-2.5 rounded-full ring-1 ring-slate-200" style={{ backgroundColor: selectedColor.hex }} />
+                          <span className="text-[10px] font-bold text-slate-700 uppercase tracking-wider">{selectedColor.name}</span>
                         </div>
                       </div>
                     )}
-                    <div className="flex justify-between"><span className="text-slate-500">Model</span><span className="font-medium">{selectedModel?.manufacturer || ''} {selectedModel?.name || 'N/A'}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Powertrain</span><span className="font-medium">{selectedVariant?.powertrain?.display_label || 'N/A'}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Vehicle No.</span><span className="font-mono font-medium">{vehicleNumber}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Sale Date</span><span className="font-medium">{new Date(saleDate).toLocaleDateString()}</span></div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-medium text-slate-500">Powertrain</span>
+                      <div className="flex items-center gap-1.5">
+                        {selectedVariant?.model?.powertrain?.type?.toLowerCase().includes('electric') ? (
+                          <Zap className="w-3 h-3 text-amber-500" />
+                        ) : (
+                          <Droplets className="w-3 h-3 text-blue-500" />
+                        )}
+                        <span className="text-sm font-bold text-slate-900 uppercase tracking-tight">{selectedVariant?.powertrain?.display_label || 'N/A'}</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-medium text-slate-500">VLM Identifier</span>
+                      <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded uppercase">{vehicleNumber}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 pt-6 border-t border-slate-100">
+                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Catalog Overview</h4>
+                     <SpecDisplay 
+                        categorySlug={selectedVariant?.model?.category?.slug}
+                        subcategorySlug={selectedVariant?.model?.subcategory?.slug}
+                        powertrainSlug={selectedVariant?.model?.powertrain?.slug}
+                        specs={selectedVariant?.specs || {}}
+                        compact
+                      />
                   </div>
                 </div>
-                <div>
-                  <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Customer</h3>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between"><span className="text-slate-500">Name</span><span className="font-medium">{selectedCustomer?.name || 'N/A'}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Phone</span><span className="font-medium">{selectedCustomer?.phone || 'N/A'}</span></div>
-                    <div className="flex justify-between"><span className="text-slate-500">Type</span><span className="font-medium capitalize">{selectedCustomer?.customer_type?.replace('_',' ') || 'N/A'}</span></div>
+
+                <div className="bg-slate-50/50 rounded-2xl p-6 border border-slate-100">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Customer Relation</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 bg-white rounded-xl shadow-sm flex items-center justify-center border border-slate-100">
+                        <UserIcon className="w-5 h-5 text-slate-400" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">{selectedCustomer?.name || 'N/A'}</p>
+                        <p className="text-[10px] font-medium text-slate-500">{selectedCustomer?.phone || 'N/A'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3 mt-4">
+                      <div className="bg-white p-3 rounded-xl border border-slate-100">
+                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Segment</p>
+                         <p className="text-xs font-bold text-slate-900 capitalize">{selectedCustomer?.customer_type?.replace('_',' ') || 'Individual'}</p>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-100">
+                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Loyalty State</p>
+                         <p className="text-xs font-bold text-emerald-600">Active</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-6">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Internal Notes</p>
+                      <p className="text-xs text-slate-600 italic line-clamp-3 bg-white p-3 rounded-xl border border-dashed border-slate-200">
+                         {saleNotes || 'No additional handover notes provided.'}
+                      </p>
+                    </div>
                   </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card className="p-0 border-indigo-200 bg-gradient-to-br from-indigo-50 to-white overflow-hidden shadow-sm">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-indigo-500" />
+                    <h2 className="text-lg font-bold text-slate-800 tracking-tight">Total Cost of Ownership ({tcoProjection?.years} Years)</h2>
+                  </div>
+                  <Badge variant="neutral" className="bg-white border-indigo-100 text-indigo-700 font-bold uppercase tracking-widest text-[9px]">Calculated ROI Insight</Badge>
+                </div>
+                
+                <div className="bg-white/60 p-5 rounded-2xl border border-indigo-100 mb-8">
+                  {tcoProjection?.isEV ? (
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 bg-emerald-100 rounded-xl shadow-inner">
+                        <Leaf className="w-5 h-5 text-emerald-600" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-black text-emerald-900 uppercase tracking-tight">EV Economy Advantage</p>
+                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">Best Selection</span>
+                        </div>
+                        <p className="text-xs text-emerald-700 mt-1 leading-relaxed font-medium">
+                          By choosing an electric powertrain, you're projected to save nearly <strong className="text-emerald-900">{formatPrice(tcoProjection.evSavings)}</strong> in energy costs over {tcoProjection?.years} years compared to a diesel-powered equivalent.
+                        </p>
+                        <div className="mt-3 grid grid-cols-2 gap-4">
+                          <div className="bg-white/40 p-2 rounded-lg border border-emerald-100">
+                             <p className="text-[9px] font-bold text-emerald-600 uppercase">Diesel benchmark</p>
+                             <p className="text-sm font-black text-slate-600">{formatPrice(tcoProjection.dieselBenchmark)}</p>
+                          </div>
+                          <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-200">
+                             <p className="text-[9px] font-bold text-emerald-600 uppercase">EV ENERGY COST</p>
+                             <p className="text-sm font-black text-emerald-700">{formatPrice(tcoProjection.energy)}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 bg-amber-100 rounded-xl shadow-inner">
+                        <Flame className="w-5 h-5 text-amber-600" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-black text-amber-900 uppercase tracking-tight">Fuel Efficiency & Maintenance</p>
+                        <p className="text-xs text-amber-700 mt-1 leading-relaxed font-medium">
+                          Your selected powertrain is high-performance. We recommend our 5-Year Maintenance Packages to lock-in current service rates and protect against rising spare parts costs.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mb-10">
+                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
+                     <ShieldCheck className="w-3.5 h-3.5" /> Maintenance Protection Packages
+                   </h3>
+                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                      {tcoProjection?.amcPackages.map((pkg) => {
+                        const isSelected = selectedAmcId === pkg.id;
+                        return (
+                          <button
+                            key={pkg.id}
+                            onClick={() => setSelectedAmcId(pkg.id)}
+                            className={cn(
+                              "text-left p-4 rounded-2xl border-2 transition-all relative overflow-hidden group flex flex-col justify-between h-full",
+                              isSelected 
+                                ? "border-indigo-600 bg-indigo-50/50 shadow-lg shadow-indigo-100 ring-2 ring-indigo-200" 
+                                : "border-slate-100 bg-white hover:border-indigo-200 hover:shadow-md"
+                            )}
+                          >
+                            <div>
+                               <div className="flex justify-between items-start mb-2">
+                                <span className={cn("text-[9px] font-black uppercase tracking-widest", isSelected ? "text-indigo-600" : "text-slate-400")}>
+                                  {pkg.label}
+                                </span>
+                                {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-indigo-600" />}
+                              </div>
+                              <p className="text-base font-black text-slate-900 tracking-tight">
+                                {pkg.price === 0 ? "INCLUDED" : formatPrice(pkg.price)}
+                              </p>
+                              <p className="text-[9px] text-slate-500 mt-1 font-bold uppercase tracking-wider">{pkg.desc}</p>
+                            </div>
+                            
+                            <div className={cn(
+                              "mt-4 pt-3 border-t text-[10px] font-black flex items-center gap-1.5 transition-colors",
+                              isSelected ? "border-indigo-200 text-emerald-600" : "border-slate-100 text-slate-400"
+                            )}>
+                               <BadgePercent className="w-3 h-3" />
+                               {pkg.id === 'standard' ? "BASE COVERAGE" : `SAVE ~${formatPrice(Math.round(pkg.savings))}`}
+                            </div>
+                          </button>
+                        );
+                      })}
+                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* Maintenance Card */}
+                  <div className={cn(
+                    "rounded-2xl p-6 border transition-all duration-500 relative group overflow-hidden",
+                    tcoProjection?.routineOutOfPocket === 0 
+                      ? "bg-emerald-50 border-emerald-200 shadow-sm" 
+                      : "bg-white border-slate-100 shadow-sm"
+                  )}>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className={cn(
+                        "w-10 h-10 rounded-xl flex items-center justify-center transition-colors",
+                        tcoProjection?.routineOutOfPocket === 0 ? "bg-emerald-100" : "bg-slate-50"
+                      )}>
+                        <Droplets className={cn("w-5 h-5", tcoProjection?.routineOutOfPocket === 0 ? "text-emerald-600" : "text-slate-400")} />
+                      </div>
+                      {tcoProjection?.routineOutOfPocket === 0 && (
+                        <div className="px-2 py-0.5 bg-emerald-600 text-[8px] font-black text-white rounded-full uppercase tracking-widest">Fully Covered</div>
+                      )}
+                    </div>
+                    
+                    <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase mb-1">Routine Service</p>
+                    <div className="flex items-baseline gap-2">
+                       <p className={cn(
+                         "text-2xl font-black tracking-tight",
+                         tcoProjection?.routineOutOfPocket === 0 ? "text-emerald-700" : "text-slate-900"
+                       )}>
+                         {tcoProjection?.routineOutOfPocket === 0 ? "ZERO COST" : formatPrice(tcoProjection?.routineOutOfPocket || 0)}
+                       </p>
+                       {tcoProjection?.routineOutOfPocket === 0 && (
+                         <p className="text-[10px] text-slate-400 font-bold line-through opacity-60">{formatPrice(tcoProjection?.routineMarket || 0)}</p>
+                       )}
+                    </div>
+                    
+                    <div className="mt-4 pt-4 border-t border-slate-50/50 flex flex-col gap-1.5">
+                       <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tight flex items-center gap-1.5">
+                         <span className="w-1 h-1 rounded-full bg-slate-400" />
+                         ~10 Routine Service Visits
+                       </p>
+                       <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tight flex items-center gap-1.5">
+                         <span className="w-1 h-1 rounded-full bg-slate-400" />
+                         {tcoProjection?.currentAmc?.years}-Year Service Lock-in
+                       </p>
+                    </div>
+                  </div>
+
+                  {/* Wear & Tear Card */}
+                  <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm group hover:border-indigo-100 transition-colors">
+                    <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center mb-4 group-hover:bg-indigo-50 transition-colors">
+                      <Archive className="w-5 h-5 text-slate-400 group-hover:text-indigo-500" />
+                    </div>
+                    <p className="text-[10px] font-black text-slate-400 tracking-widest uppercase mb-1">Wear & Tear Parts</p>
+                    <p className="text-2xl font-black text-slate-900 tracking-tight">{formatPrice(tcoProjection?.wearAndTear || 0)}</p>
+                    <p className="text-[9px] text-slate-500 mt-2 font-bold uppercase tracking-widest flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 text-amber-500" /> T&C Applied
+                    </p>
+                    <div className="mt-4 pt-4 border-t border-slate-50 flex flex-col gap-1.5">
+                       <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight">Brake pads, wipers, belts</p>
+                       <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tight italic">Industry average projections</p>
+                    </div>
+                  </div>
+
+                  {/* Fuel/Energy Card */}
+                  <div className="bg-indigo-600 rounded-2xl p-6 border border-indigo-500 shadow-xl flex flex-col justify-between text-white relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.1),transparent)]" />
+                    <div>
+                      <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center mb-4 backdrop-blur-sm">
+                        {tcoProjection?.isEV ? <Zap className="w-5 h-5" /> : <Fuel className="w-5 h-5" />}
+                      </div>
+                      <p className="text-[10px] font-black text-indigo-200 tracking-widest uppercase mb-1">
+                        {tcoProjection?.isEV ? 'Energy Consumption' : 'Fuel Expenditure'}
+                      </p>
+                      <p className="text-2xl font-black tracking-tight">{formatPrice(tcoProjection?.energy || 0)}</p>
+                    </div>
+                    
+                    <div className="mt-6 pt-4 border-t border-white/10">
+                       <p className="text-[10px] text-indigo-100 opacity-90 font-bold tracking-tight uppercase">Based on 75,000 km Total</p>
+                       <p className="text-[9px] text-indigo-200 mt-1 uppercase tracking-widest leading-none">15k KM Yearly usage avg</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-10 p-5 rounded-2xl bg-indigo-50/50 border border-indigo-100 flex flex-col sm:flex-row justify-between items-center gap-6">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 p-1.5 bg-indigo-100 rounded-lg">
+                       <Info className="w-4 h-4 text-indigo-600" />
+                    </div>
+                    <div>
+                      <p className="text-[11px] text-indigo-900 font-black uppercase tracking-tight">
+                        {selectedAmcId === 'standard' 
+                          ? "Standard Coverage Applied. Upgrade for guaranteed savings."
+                          : `${tcoProjection?.currentAmc?.label} Applied: Your projected saving is ${formatPrice(tcoProjection?.amcSavings || 0)}`
+                        }
+                      </p>
+                      <p className="text-[10px] text-indigo-600 mt-0.5 font-medium">Calculation based on industry average workshop labor and spare parts rates.</p>
+                    </div>
+                  </div>
+                  {selectedAmcId !== 'standard' && (
+                    <div className="flex items-center gap-3 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
+                       <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                       <span className="text-[10px] font-black uppercase tracking-widest">AMC ACTIVE</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>
@@ -1108,12 +1651,27 @@ export function NewSalePage() {
                   onClick={handleNext} 
                   className="px-10 shadow-lg shadow-indigo-600/10"
                 >
+                  Continue to {totalSteps === 5 ? 'handover ritual' : 'confirm'}
+                  <ChevronRight className="w-4 h-4 ml-2" />
+                </Button>
+              )}
+
+              {step === 4 && totalSteps === 5 && (
+                <Button 
+                  disabled={
+                    (workflowConfig?.enable_pdi && !checklist.pdi) || 
+                    (workflowConfig?.require_documents && !checklist.docs) || 
+                    (workflowConfig?.enable_warranty_activation && !checklist.warranty)
+                  }
+                  onClick={handleNext} 
+                  className="px-10 shadow-lg shadow-indigo-600/10"
+                >
                   Continue to confirm
                   <ChevronRight className="w-4 h-4 ml-2" />
                 </Button>
               )}
 
-              {step === 4 && (
+              {((step === 4 && totalSteps === 4) || (step === 5)) && (
                 <Button 
                   className="px-12 shadow-lg shadow-indigo-600/20" 
                   onClick={() => recordSaleMutation.mutate()} 
@@ -1139,5 +1697,63 @@ export function NewSalePage() {
 
       </div>
     </PageWrapper>
+  );
+}
+
+function HandoverCheckbox({ label, checked, onToggle }: { label: string, checked: boolean, onToggle: () => void }) {
+  return (
+    <div 
+      className="flex items-center gap-3 p-2 rounded-lg hover:bg-white cursor-pointer transition-colors"
+      onClick={onToggle}
+    >
+      <div className={cn(
+        "w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
+        checked ? "bg-indigo-600 border-indigo-600 text-white" : "border-slate-200 bg-white"
+      )}>
+        {checked && <CheckCircle2 className="w-3 h-3" />}
+      </div>
+      <span className={cn("text-xs font-medium", checked ? "text-slate-900" : "text-slate-500")}>
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function DocumentUploader({ label, value, required, onUpload }: { label: string, type: string, value?: any, required?: boolean, onUpload: (f: File) => void }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+        {value && (
+          <span className="text-[9px] font-bold text-emerald-600 flex items-center gap-1">
+            <CheckCircle2 className="w-3 h-3" /> UPLOADED
+          </span>
+        )}
+      </div>
+      <div className={cn(
+        "relative group cursor-pointer border-2 border-dashed rounded-xl p-3 text-center transition-all",
+        value ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/30"
+      )}>
+        <input 
+          type="file" 
+          className="absolute inset-0 opacity-0 cursor-pointer" 
+          onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])}
+          accept="image/*,.pdf"
+        />
+        {value ? (
+          <div className="flex items-center justify-center gap-2">
+             <FileText className="w-4 h-4 text-emerald-600" />
+             <span className="text-xs font-medium text-emerald-700 truncate max-w-[150px]">{value.name}</span>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-1">
+            <Upload className="w-4 h-4 text-slate-400 group-hover:text-indigo-600" />
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Click to upload</span>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }

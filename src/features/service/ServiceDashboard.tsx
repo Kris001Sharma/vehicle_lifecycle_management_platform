@@ -5,8 +5,8 @@ import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuthStore } from '@/features/auth/store/authStore';
-import { searchVehicleForService, getOpenJobCards, getVehiclesDueForService } from '@/lib/db/service';
-import { Search, ChevronRight, Activity, Wrench, Clock, AlertTriangle, MessageSquare, Calendar, Zap } from 'lucide-react';
+import { searchVehicleForService, getOpenJobCards, getVehiclesDueForService, getServiceDashboardStats, getServiceActionCenter } from '@/lib/db/service';
+import { Search, ChevronRight, Activity, Wrench, Clock, AlertTriangle, MessageSquare, Calendar, Zap, Phone } from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { format } from 'date-fns';
 
@@ -27,6 +27,18 @@ export function ServiceDashboard() {
   const { data: openCards, isLoading: isOpenCardsLoading } = useQuery({
     queryKey: ['service_open_cards', tenantId],
     queryFn: () => getOpenJobCards(tenantId!),
+    enabled: !!tenantId
+  });
+
+  const { data: stats } = useQuery({
+    queryKey: ['service_stats', tenantId],
+    queryFn: () => getServiceDashboardStats(tenantId!),
+    enabled: !!tenantId
+  });
+
+  const { data: actionCenter, isLoading: actionLoading } = useQuery({
+    queryKey: ['service_action_center', tenantId],
+    queryFn: () => getServiceActionCenter(tenantId!),
     enabled: !!tenantId
   });
 
@@ -65,7 +77,7 @@ export function ServiceDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-indigo-100 text-sm font-medium">Active Bays</p>
-              <h3 className="text-2xl font-bold mt-1">{openCards?.length || 0}</h3>
+              <h3 className="text-2xl font-bold mt-1">{stats?.activeBays || 0}</h3>
             </div>
             <div className="p-2 bg-white/20 rounded-lg">
               <Wrench className="w-5 h-5 text-white" />
@@ -76,7 +88,7 @@ export function ServiceDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-slate-500 text-sm font-medium">Avg Turn-around</p>
-              <h3 className="text-2xl font-bold text-slate-800 mt-1">2.4h</h3>
+              <h3 className="text-2xl font-bold text-slate-800 mt-1">{stats?.avgTurnaround || '2.4'}h</h3>
             </div>
             <div className="p-2 bg-emerald-50 rounded-lg">
               <Clock className="w-5 h-5 text-emerald-600" />
@@ -88,7 +100,7 @@ export function ServiceDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-slate-500 text-sm font-medium">Predictive Alerts</p>
-              <h3 className="text-2xl font-bold text-slate-800 mt-1">{dueVehicles?.length || 0}</h3>
+              <h3 className="text-2xl font-bold text-slate-800 mt-1">{stats?.predictiveAlerts || 0}</h3>
             </div>
             <div className="p-2 bg-amber-50 rounded-lg">
               <Activity className="w-5 h-5 text-amber-600" />
@@ -100,7 +112,7 @@ export function ServiceDashboard() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-slate-500 text-sm font-medium">Customer Approvals</p>
-              <h3 className="text-2xl font-bold text-slate-800 mt-1">3</h3>
+              <h3 className="text-2xl font-bold text-slate-800 mt-1">{stats?.approvalsPending || 3}</h3>
             </div>
             <div className="p-2 bg-rose-50 rounded-lg">
               <MessageSquare className="w-5 h-5 text-rose-600" />
@@ -199,8 +211,82 @@ export function ServiceDashboard() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        {/* Main Drive-Lane Area */}
         <div className="xl:col-span-2">
+          {/* Service Action Center (Mission Critical) */}
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-rose-500" /> Service Action Center
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Blocked Jobs */}
+              <Card className="p-0 border-rose-200 overflow-hidden shadow-sm">
+                <div className="bg-rose-50 px-4 py-3 border-b border-rose-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-600" />
+                    <span className="font-bold text-rose-900 text-sm uppercase tracking-wide">Blocked Jobs</span>
+                  </div>
+                  <span className="bg-rose-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    {actionCenter?.blockedJobs?.length || 0} Actions
+                  </span>
+                </div>
+                <div className="divide-y divide-rose-50">
+                  {actionLoading ? (
+                    <div className="p-4"><Skeleton className="h-12 w-full" /></div>
+                  ) : actionCenter?.blockedJobs && actionCenter.blockedJobs.length > 0 ? (
+                    actionCenter.blockedJobs.map((card: any) => (
+                      <div key={card.id} className="p-4 hover:bg-rose-50/50 cursor-pointer transition-colors" onClick={() => navigate(`/service/job-card/${card.id}/edit`)}>
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="font-mono font-bold text-slate-900">{card.vehicle?.vehicle_number}</span>
+                          <span className="text-[10px] font-bold text-rose-600 bg-rose-100 px-2 py-0.5 rounded uppercase">Issue Detected</span>
+                        </div>
+                        <p className="text-xs text-slate-600 mb-2 truncate">{(card.complaint || card.diagnosis) || 'No details'}</p>
+                        <div className="flex gap-2">
+                          <button className="text-[10px] uppercase font-bold tracking-wider text-rose-700 bg-rose-100/80 px-3 py-1 rounded hover:bg-rose-200 transition-colors flex items-center gap-1">
+                            <Phone className="w-3 h-3" /> Call Customer
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-xs text-slate-400">No blocked job cards.</div>
+                  )}
+                </div>
+              </Card>
+
+              {/* Delivery Due Today */}
+              <Card className="p-0 border-indigo-200 overflow-hidden shadow-sm">
+                <div className="bg-indigo-50 px-4 py-3 border-b border-indigo-100 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-indigo-600" />
+                    <span className="font-bold text-indigo-900 text-sm uppercase tracking-wide">Delivery Due Today</span>
+                  </div>
+                  <span className="bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    {actionCenter?.deliveriesDue?.length || 0} Vehicle
+                  </span>
+                </div>
+                <div className="divide-y divide-indigo-50">
+                  {actionLoading ? (
+                    <div className="p-4"><Skeleton className="h-12 w-full" /></div>
+                  ) : actionCenter?.deliveriesDue && actionCenter.deliveriesDue.length > 0 ? (
+                    actionCenter.deliveriesDue.map((card: any) => (
+                      <div key={card.id} className="p-4">
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="font-mono font-bold text-slate-900">{card.vehicle?.vehicle_number}</span>
+                          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded uppercase">{card.status}</span>
+                        </div>
+                        <p className="text-xs text-slate-600 mb-2 truncate">{card.vehicle?.customer?.name}</p>
+                        <button className="w-full mt-1 text-[10px] uppercase font-bold tracking-widest text-white bg-indigo-600 py-2 rounded hover:bg-indigo-700 transition-colors">Notify Customer</button>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-xs text-slate-400">No deliveries scheduled for today.</div>
+                  )}
+                </div>
+              </Card>
+            </div>
+          </div>
+
+          {/* Main Drive-Lane Area */}
           <div className="flex justify-between items-end mb-4">
             <h2 className="text-xl font-bold text-slate-800">Active Bays / Job Cards</h2>
             <button onClick={() => navigate('/service/job-cards')} className="text-sm font-medium text-indigo-600 hover:text-indigo-800">

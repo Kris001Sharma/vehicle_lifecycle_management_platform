@@ -18,6 +18,83 @@ DROP TRIGGER IF EXISTS set_updated_at ON public.tenants;
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.tenants
   FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
 
+-- tenant_workflow_config table
+CREATE TABLE IF NOT EXISTS public.tenant_workflow_config (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL UNIQUE
+    REFERENCES public.tenants(id) ON DELETE CASCADE,
+  enable_pdi BOOLEAN NOT NULL DEFAULT true,
+  enable_document_verification BOOLEAN NOT NULL DEFAULT true,
+  enable_warranty_activation BOOLEAN NOT NULL DEFAULT true,
+  require_documents BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.tenant_workflow_config ENABLE ROW LEVEL SECURITY;
+
+-- Trigger for workflow_config
+DROP TRIGGER IF EXISTS set_updated_at ON public.tenant_workflow_config;
+CREATE TRIGGER set_updated_at BEFORE UPDATE ON public.tenant_workflow_config
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- RLS for workflow_config
+CREATE POLICY "Tenant users can view workflow config"
+  ON public.tenant_workflow_config FOR SELECT
+  USING (auth.uid() IN (
+    SELECT user_id FROM public.tenant_users WHERE tenant_id = tenant_workflow_config.tenant_id
+  ));
+
+CREATE POLICY "Admins can update workflow config"
+  ON public.tenant_workflow_config FOR UPDATE
+  USING (auth.uid() IN (
+    SELECT user_id FROM public.tenant_users WHERE tenant_id = tenant_workflow_config.tenant_id AND role = 'admin'
+  ));
+
+-- customer_documents table
+CREATE TABLE IF NOT EXISTS public.customer_documents (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  customer_id UUID NOT NULL REFERENCES public.customers(id) ON DELETE CASCADE,
+  doc_type TEXT NOT NULL, -- 'id_proof', 'registration', 'insurance', 'warranty'
+  file_name TEXT,
+  file_url TEXT, -- Base64 or local path for now, Cloudinary later
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.customer_documents ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Tenant users can manage documents"
+  ON public.customer_documents FOR ALL
+  USING (auth.uid() IN (
+    SELECT user_id FROM public.tenant_users WHERE tenant_id = customer_documents.tenant_id
+  ));
+
+-- Update vehicles to track handover state
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vehicles' AND column_name = 'handover_ritual_completed') THEN
+    ALTER TABLE public.vehicles ADD COLUMN handover_ritual_completed BOOLEAN DEFAULT false;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vehicles' AND column_name = 'warranty_certificate_no') THEN
+    ALTER TABLE public.vehicles ADD COLUMN warranty_certificate_no TEXT;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vehicles' AND column_name = 'has_amc') THEN
+    ALTER TABLE public.vehicles ADD COLUMN has_amc BOOLEAN DEFAULT false;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vehicles' AND column_name = 'amc_years') THEN
+    ALTER TABLE public.vehicles ADD COLUMN amc_years INT;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'vehicles' AND column_name = 'amc_package_id') THEN
+    ALTER TABLE public.vehicles ADD COLUMN amc_package_id TEXT;
+  END IF;
+END $$;
+
 -- tenant_catalog_config table
 CREATE TABLE IF NOT EXISTS public.tenant_catalog_config (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
