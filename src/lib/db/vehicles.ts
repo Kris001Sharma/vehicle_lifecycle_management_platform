@@ -207,7 +207,7 @@ export async function createVehicleSale(
           vehicle_id: vehicle.id,
           visit_date: nextDate.toISOString().split('T')[0], // Projected date
           visit_type: 'routine',
-          status: 'open', // This marks it as a "Scheduled" or "CRM Lead"
+          status: 'scheduled', // This marks it as an appointment/lead rather than an active job card
           complaint: 'First free service (Auto-scheduled from Sale Handover)',
           next_service_date: nextDate.toISOString().split('T')[0]
         });

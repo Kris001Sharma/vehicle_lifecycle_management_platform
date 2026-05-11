@@ -390,6 +390,7 @@ export function VehicleServicePage() {
                                       <th className="px-4 py-2 text-left text-xs font-medium text-slate-500">Part</th>
                                       <th className="px-4 py-2 text-left text-xs font-medium text-slate-500">Action</th>
                                       <th className="px-4 py-2 text-right text-xs font-medium text-slate-500">Qty</th>
+                                      <th className="px-4 py-2 text-right text-xs font-medium text-slate-500">Price</th>
                                     </tr>
                                   </thead>
                                 )}
@@ -402,8 +403,21 @@ export function VehicleServicePage() {
                                       </td>
                                       <td className="px-4 py-2 text-sm text-slate-600 capitalize">{p.action}</td>
                                       <td className="px-4 py-2 text-sm text-slate-800 text-right">{p.quantity}</td>
+                                      <td className="px-4 py-2 text-sm text-slate-800 text-right font-mono">
+                                        {p.price > 0 ? `₹${p.price.toLocaleString()}` : <span className="text-emerald-600 font-bold text-[10px]">AMC COVER</span>}
+                                      </td>
                                     </tr>
                                   ))}
+                                  <tr className="bg-slate-50/50">
+                                    <td colSpan={3} className="px-4 py-2 text-xs font-bold text-slate-500 text-right uppercase tracking-wider">Labor Charge</td>
+                                    <td className="px-4 py-2 text-sm text-slate-800 text-right font-mono">
+                                      {record.labor_cost > 0 ? `₹${record.labor_cost.toLocaleString()}` : <span className="text-emerald-600 font-bold text-[10px]">AMC COVER</span>}
+                                    </td>
+                                  </tr>
+                                  <tr className="bg-slate-100/50">
+                                    <td colSpan={3} className="px-4 py-2 text-xs font-black text-slate-900 text-right uppercase tracking-wider">Total Bill</td>
+                                    <td className="px-4 py-2 text-base font-black text-slate-950 text-right font-mono">₹{record.total_cost?.toLocaleString() || '0'}</td>
+                                  </tr>
                                 </tbody>
                               </table>
                             </div>

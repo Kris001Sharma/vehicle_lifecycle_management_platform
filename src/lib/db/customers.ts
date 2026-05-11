@@ -70,6 +70,9 @@ export async function getCustomerById(customerId: string, tenantId: string) {
       total_service_count,
       status,
       is_archived,
+      has_amc,
+      amc_package_id,
+      handover_ritual_completed,
       variant:vehicle_variants (
         name,
         powertrain:powertrain_types (display_label),

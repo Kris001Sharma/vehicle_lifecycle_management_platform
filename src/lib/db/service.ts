@@ -107,6 +107,9 @@ export async function getServiceRecord(recordId: string, tenantId: string) {
 }
 
 export async function createServiceRecord(data: ServiceRecordInput, vehicleId: string, parts: PartInput[], tenantId: string, _userId: string) {
+  const partsCost = parts.reduce((acc, p) => acc + (p.price * p.quantity), 0);
+  const totalCost = partsCost + (data.labor_cost || 0);
+
   const { data: record, error } = await supabase
     .from('service_records')
     .insert({
@@ -121,6 +124,9 @@ export async function createServiceRecord(data: ServiceRecordInput, vehicleId: s
       technician_name: data.technician_name,
       next_service_date: data.next_service_date,
       next_service_km: data.next_service_km,
+      labor_cost: data.labor_cost || 0,
+      total_parts_cost: partsCost,
+      total_cost: totalCost,
       status: 'open'
     })
     .select()
@@ -153,6 +159,9 @@ export async function updateServiceRecord(recordId: string, data: ServiceRecordI
   if (!existing) return { error: 'RECORD_NOT_FOUND' };
   if (existing.status === 'completed') return { error: 'RECORD_CLOSED' };
 
+  const partsCost = parts.reduce((acc, p) => acc + (p.price * p.quantity), 0);
+  const totalCost = partsCost + (data.labor_cost || 0);
+
   const { data: record, error } = await supabase
     .from('service_records')
     .update({
@@ -165,6 +174,9 @@ export async function updateServiceRecord(recordId: string, data: ServiceRecordI
       technician_name: data.technician_name,
       next_service_date: data.next_service_date,
       next_service_km: data.next_service_km,
+      labor_cost: data.labor_cost || 0,
+      total_parts_cost: partsCost,
+      total_cost: totalCost,
     })
     .eq('id', recordId)
     .select()
@@ -223,6 +235,31 @@ export async function getOpenJobCards(tenantId: string) {
 
   if (error) {
     console.error("Failed to get open job cards", error);
+    return [];
+  }
+
+  return (data || []).map((card: any) => ({
+    ...card,
+    vehicle: {
+      ...card.vehicle,
+      model: card.vehicle?.variant?.model
+    }
+  }));
+}
+
+export async function getScheduledServices(tenantId: string) {
+  const { data, error } = await supabase
+    .from('service_records')
+    .select(`
+      *,
+      vehicle:vehicles(vehicle_number, customer:customers(name, phone), variant:vehicle_variants(model:vehicle_models(manufacturer, name, category:vehicle_categories(name))))
+    `)
+    .eq('status', 'scheduled')
+    .eq('tenant_id', tenantId)
+    .order('visit_date', { ascending: true });
+
+  if (error) {
+    console.error("Failed to get scheduled services", error);
     return [];
   }
 

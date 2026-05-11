@@ -353,9 +353,22 @@ export function CustomerDetailPage() {
                       >
                         <div className="flex justify-between items-start mb-2">
                           <span className="font-mono font-bold text-slate-900 text-sm">{v.vehicle_number}</span>
-                          <div className="flex gap-1">
+                          <div className="flex flex-wrap justify-end gap-1">
+                            {v.handover_ritual_completed && (
+                              <Badge className="bg-emerald-50 text-emerald-700 border-emerald-100 text-[9px] px-1.5 py-0">Ritual ✓</Badge>
+                            )}
+                            {v.amc_package_id && v.amc_package_id !== 'standard' && (
+                              <Badge className={cn(
+                                "text-[9px] px-1.5 py-0 capitalize",
+                                v.amc_package_id === 'gold' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                                v.amc_package_id === 'platinum' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
+                                'bg-slate-100 text-slate-700 border-slate-200'
+                              )}>
+                                {v.amc_package_id} AMC
+                              </Badge>
+                            )}
                             {v.is_archived && <Badge variant="warning">Archived</Badge>}
-                            <Badge variant={v.status === 'active' ? 'success' : v.status === 'transferred' ? 'neutral' : 'error'} className="capitalize">
+                            <Badge variant={v.status === 'active' ? 'success' : v.status === 'transferred' ? 'neutral' : 'error'} className="capitalize text-[9px] px-1.5 py-0">
                               {v.status}
                             </Badge>
                           </div>

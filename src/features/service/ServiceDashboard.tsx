@@ -3,10 +3,31 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useAuthStore } from '@/features/auth/store/authStore';
-import { searchVehicleForService, getOpenJobCards, getVehiclesDueForService, getServiceDashboardStats, getServiceActionCenter } from '@/lib/db/service';
-import { Search, ChevronRight, Activity, Wrench, Clock, AlertTriangle, MessageSquare, Calendar, Zap, Phone } from 'lucide-react';
+import { 
+  searchVehicleForService, 
+  getOpenJobCards, 
+  getVehiclesDueForService, 
+  getServiceDashboardStats, 
+  getServiceActionCenter,
+  getScheduledServices
+} from '@/lib/db/service';
+import { 
+  Search, 
+  ChevronRight, 
+  Activity, 
+  Wrench, 
+  Clock, 
+  AlertTriangle, 
+  MessageSquare, 
+  Calendar, 
+  Zap, 
+  Phone,
+  ArrowRightCircle,
+  Truck
+} from 'lucide-react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { format } from 'date-fns';
 
@@ -27,6 +48,12 @@ export function ServiceDashboard() {
   const { data: openCards, isLoading: isOpenCardsLoading } = useQuery({
     queryKey: ['service_open_cards', tenantId],
     queryFn: () => getOpenJobCards(tenantId!),
+    enabled: !!tenantId
+  });
+
+  const { data: scheduledServices, isLoading: isScheduledLoading } = useQuery({
+    queryKey: ['service_scheduled', tenantId],
+    queryFn: () => getScheduledServices(tenantId!),
     enabled: !!tenantId
   });
 
@@ -212,6 +239,46 @@ export function ServiceDashboard() {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <div className="xl:col-span-2">
+          {/* Intake Pipeline (Upcoming from Sales) */}
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+              <ArrowRightCircle className="w-5 h-5 text-indigo-500" /> Intake Pipeline
+              <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full ml-auto">Appointments & Lead Bridge</span>
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {isScheduledLoading ? (
+                <Card className="p-4"><Skeleton className="h-20 w-full" /></Card>
+              ) : scheduledServices && scheduledServices.length > 0 ? (
+                scheduledServices.map((service: any) => (
+                  <Card key={service.id} className="p-4 border-dashed border-indigo-200 hover:border-indigo-400 transition-colors cursor-pointer group bg-indigo-50/10" onClick={() => navigate(`/service/job-card/${service.id}/edit`)}>
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex items-center gap-2">
+                        <Truck className="w-4 h-4 text-indigo-400" />
+                        <span className="font-mono font-bold text-slate-900 group-hover:text-indigo-600 tracking-tight">{service.vehicle?.vehicle_number}</span>
+                      </div>
+                      <Badge variant="info" className="text-[9px] uppercase font-bold tracking-widest bg-indigo-100/50 text-indigo-700 border-none px-1.5 py-0">Scheduled</Badge>
+                    </div>
+                    <p className="text-xs text-slate-600 truncate mb-1">{service.vehicle?.customer?.name}</p>
+                    <div className="flex justify-between items-center mt-3">
+                       <div className="flex items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                         <Calendar className="w-3.5 h-3.5 mr-1" />
+                         Due: {format(new Date(service.visit_date), 'MMM d, yyyy')}
+                       </div>
+                       <button className="text-[9px] font-black uppercase tracking-tighter text-indigo-600 flex items-center gap-0.5 hover:gap-1 transition-all">
+                         Open Job Card <ChevronRight className="w-3 h-3" />
+                       </button>
+                    </div>
+                  </Card>
+                ))
+              ) : (
+                <div className="col-span-full py-8 border-2 border-dashed border-slate-100 rounded-2xl flex flex-col items-center justify-center text-center bg-slate-50/30">
+                  <Clock className="w-8 h-8 text-slate-200 mb-2" />
+                  <p className="text-sm font-semibold text-slate-400 uppercase tracking-widest">No upcoming deliveries scheduled</p>
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Service Action Center (Mission Critical) */}
           <div className="mb-8">
             <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">

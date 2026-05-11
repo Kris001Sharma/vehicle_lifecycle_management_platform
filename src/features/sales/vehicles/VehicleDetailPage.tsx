@@ -9,7 +9,11 @@ import {
   Edit3, 
   ChevronRight,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  ShieldCheck,
+  Zap,
+  Award,
+  BadgePercent
 } from 'lucide-react';
 import { PageWrapper } from '@/components/layout/PageWrapper';
 import { Button } from '@/components/ui/Button';
@@ -65,6 +69,16 @@ export function VehicleDetailPage() {
 
   const preBooking: any = preBookings && preBookings.length > 0 ? preBookings[0] : null;
 
+  const amcLabels: Record<string, { label: string, color: string, icon: any }> = {
+    'standard': { label: 'Standard Warranty', color: 'bg-slate-100 text-slate-600', icon: ShieldCheck },
+    'silver': { label: 'Silver AMC (+1yr)', color: 'bg-slate-200 text-slate-700', icon: Award },
+    'gold': { label: 'Gold AMC (+2yrs)', color: 'bg-amber-100 text-amber-700', icon: Zap },
+    'platinum': { label: 'Platinum AMC (+3yrs)', color: 'bg-indigo-100 text-indigo-700', icon: BadgePercent },
+  };
+
+  const amcInfo = amcLabels[vehicle.amc_package_id || 'standard'] || amcLabels.standard;
+  const AmcIcon = amcInfo.icon;
+
   return (
     <PageWrapper
       title={<span className="font-mono text-slate-500 text-sm">Vehicles / <span className="text-slate-900">{vehicle.vehicle_number}</span></span>}
@@ -87,17 +101,20 @@ export function VehicleDetailPage() {
               />
               <div className="absolute inset-0 bg-linear-to-t from-slate-900/90 via-slate-900/40 to-transparent" />
               
-              <div className="absolute top-3 left-3 md:top-5 md:left-5 flex gap-2">
+              <div className="absolute top-3 left-3 md:top-5 md:left-5 flex flex-wrap gap-2">
                 {vehicle.variant?.powertrain?.display_label && (
                   <Badge variant="info" className="bg-blue-600/90 text-white border-none py-1 px-3 rounded-full backdrop-blur-md text-[9px] md:text-[10px] font-bold uppercase tracking-wider">
                     {vehicle.variant.powertrain.display_label}
                   </Badge>
                 )}
-                {vehicle.variant?.model?.subcategory && (
-                  <Badge variant="neutral" className="bg-slate-700/90 text-white border-none py-1 px-3 rounded-full backdrop-blur-md text-[9px] md:text-[10px] font-bold uppercase tracking-wider">
-                    {vehicle.variant.model.subcategory}
+                {vehicle.handover_ritual_completed && (
+                  <Badge className="bg-emerald-600/90 text-white border-none py-1 px-3 rounded-full backdrop-blur-md text-[9px] md:text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Handover Ritual Complete
                   </Badge>
                 )}
+                <Badge className={cn("border-none py-1 px-3 rounded-full backdrop-blur-md text-[9px] md:text-[10px] font-bold uppercase tracking-wider flex items-center gap-1", amcInfo.color)}>
+                  <AmcIcon className="w-3 h-3" /> {amcInfo.label}
+                </Badge>
               </div>
 
               <div className="absolute bottom-4 left-4 md:bottom-6 md:left-6">
@@ -139,6 +156,7 @@ export function VehicleDetailPage() {
                   <InfoItem label="REGISTRATION PLATE" value={vehicle.registration_plate} placeholder="-" />
                   <InfoItem label="CHASSIS NUMBER" value={vehicle.chassis_number} placeholder="-" />
                   <InfoItem label="RECORDED SALE" value={vehicle.sale_date ? new Date(vehicle.sale_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null} />
+                  <InfoItem label="WARRANTY CERT#" value={vehicle.warranty_certificate_no} placeholder="Not activated" />
                   
                   {vehicle.sale_notes && (
                     <div className="col-span-full bg-slate-50/50 p-4 rounded-lg border border-slate-100">

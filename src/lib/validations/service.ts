@@ -5,6 +5,8 @@ export const partSchema = z.object({
   part_name: z.string().min(1, "Part name is required"),
   action: z.enum(['replaced', 'repaired', 'inspected', 'adjusted']),
   quantity: z.number().int().positive().default(1),
+  price: z.number().min(0).default(0),
+  is_amc_benefit: z.boolean().default(false),
   notes: z.string().optional()
 });
 
@@ -18,6 +20,7 @@ export const serviceRecordSchema = z.object({
   technician_name: z.string().optional(),
   next_service_km: z.number().int().positive().optional(),
   next_service_date: z.string().optional(),
+  labor_cost: z.number().min(0).default(0),
   parts: z.array(partSchema).default([])
 });
 

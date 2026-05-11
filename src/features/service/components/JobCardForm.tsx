@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,7 +11,10 @@ import { createServiceRecord, updateServiceRecord, closeServiceRecord } from '@/
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useIsOnline } from '@/hooks/useIsOnline';
 import { enqueueServiceRecord } from '@/lib/offline/queue';
-import { Trash2, Plus, ArrowLeft, Wrench, Smartphone } from 'lucide-react';
+import { getVehicleWithFullDetails } from '@/lib/db/vehicles';
+import { useQuery } from '@tanstack/react-query';
+import { Trash2, Plus, ArrowLeft, Wrench, Smartphone, CreditCard, ShieldCheck } from 'lucide-react';
+import { cn } from '@/utils/cn';
 
 const FileUploader = ({ entityType, entityId }: any) => (
   <div className="p-4 border border-slate-200 border-dashed rounded-lg text-slate-400 bg-slate-50 text-center text-sm">
@@ -35,10 +38,16 @@ export function JobCardForm({ vehicleId, recordId, initialData }: JobCardFormPro
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
 
+  const { data: vehicle } = useQuery({
+    queryKey: ['vehicle', vehicleId, tenantId],
+    queryFn: () => getVehicleWithFullDetails(vehicleId, tenantId!),
+    enabled: !!vehicleId && !!tenantId
+  });
+
   const isEditMode = !!recordId;
   const isClosed = initialData?.status === 'completed';
 
-  const { register, control, handleSubmit, watch, formState: { errors }, trigger, setFocus } = useForm<ServiceRecordInput>({
+  const { register, control, handleSubmit, watch, formState: { errors }, trigger, setFocus, setValue } = useForm<ServiceRecordInput>({
     resolver: zodResolver(serviceRecordSchema),
     defaultValues: {
       visit_date: initialData?.visit_date ? initialData.visit_date.split('T')[0] : new Date().toISOString().split('T')[0],
@@ -50,14 +59,38 @@ export function JobCardForm({ vehicleId, recordId, initialData }: JobCardFormPro
       technician_name: initialData?.technician_name || '',
       next_service_km: initialData?.next_service_km || undefined,
       next_service_date: initialData?.next_service_date ? initialData.next_service_date.split('T')[0] : undefined,
+      labor_cost: initialData?.labor_cost || 0,
       parts: initialData?.parts || [],
     }
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
     control,
     name: 'parts'
   });
+
+  const visitType = watch('visit_type');
+  const parts = watch('parts');
+  const laborCost = watch('labor_cost') || 0;
+
+  const totalPartsCost = parts?.reduce((acc, p) => acc + ((p.price || 0) * (p.quantity || 1)), 0) || 0;
+  const totalCost = totalPartsCost + laborCost;
+
+  // AMC Benefit Logic: Auto-calculate zero-cost for routine services
+  const hasAmc = vehicle?.has_amc;
+  const isRoutine = visitType === 'routine';
+  const amcApplicable = hasAmc && isRoutine;
+
+  useEffect(() => {
+    if (amcApplicable) {
+      setValue('labor_cost', 0);
+      parts?.forEach((part, index) => {
+        if (!part.is_amc_benefit) {
+          update(index, { ...part, price: 0, is_amc_benefit: true });
+        }
+      });
+    }
+  }, [amcApplicable, setValue, parts?.length]);
 
   if (isClosed) {
     return (
@@ -74,6 +107,10 @@ export function JobCardForm({ vehicleId, recordId, initialData }: JobCardFormPro
              <div>
                 <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Visit Type</p>
                 <p className="text-sm font-medium capitalize">{initialData.visit_type}</p>
+             </div>
+             <div>
+                <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">Total Bill</p>
+                <p className="text-lg font-mono font-bold text-slate-900 tracking-tighter">₹{initialData.total_cost?.toLocaleString() || '0'}</p>
              </div>
           </div>
           <div className="space-y-4">
@@ -193,7 +230,12 @@ export function JobCardForm({ vehicleId, recordId, initialData }: JobCardFormPro
       )}
 
       {/* Section 1: Visit details */}
-      <Card className="p-6">
+      <Card className="p-6 relative overflow-hidden">
+        {amcApplicable && (
+          <div className="absolute top-0 right-0 p-2 px-4 bg-emerald-500 text-white text-[10px] font-bold uppercase tracking-widest rounded-bl-xl flex items-center gap-1.5 shadow-sm animate-in fade-in slide-in-from-top-1">
+            <ShieldCheck className="w-3.5 h-3.5" /> AMC Active - Benefits Applied
+          </div>
+        )}
         <h3 className="text-lg font-semibold text-slate-800 mb-4">Visit details</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -274,38 +316,108 @@ export function JobCardForm({ vehicleId, recordId, initialData }: JobCardFormPro
              <textarea rows={4} placeholder="Describe all work done in detail" className="block w-full border border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm p-2" {...register('work_done')}></textarea>
              {errors.work_done && <p className="text-red-500 text-xs mt-1">{errors.work_done.message}</p>}
            </div>
-           <div>
-             <label className="block text-sm font-medium text-slate-700 mb-1">Technician Name</label>
-             <input type="text" placeholder="Technician's name" className="block w-full border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...register('technician_name')} />
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+             <div>
+               <label className="block text-sm font-medium text-slate-700 mb-1">Technician Name</label>
+               <input type="text" placeholder="Technician's name" className="block w-full border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" {...register('technician_name')} />
+             </div>
+             <div>
+               <div className="flex justify-between items-center mb-1">
+                 <label className="block text-sm font-medium text-slate-700">Labor Charge</label>
+                 {amcApplicable && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 rounded uppercase">AMC Cover</span>}
+               </div>
+               <div className="relative">
+                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₹</span>
+                 <input 
+                   type="number" 
+                   className={cn(
+                     "block w-full pl-7 border-slate-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm font-mono",
+                     amcApplicable && "bg-emerald-50 border-emerald-200 text-emerald-700 cursor-not-allowed"
+                   )} 
+                   placeholder="0.00"
+                   {...register('labor_cost', { valueAsNumber: true })} 
+                   readOnly={amcApplicable}
+                   value={amcApplicable ? 0 : watch('labor_cost')}
+                 />
+               </div>
+             </div>
            </div>
          </div>
       </Card>
 
       {/* Section 4: Parts and materials */}
       <Card className="p-6">
-         <h3 className="text-lg font-semibold text-slate-800 mb-4">Parts and materials</h3>
+         <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-slate-800">Parts and materials</h3>
+            <div className="flex flex-col items-end">
+               <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Running Parts Total</div>
+               <div className="text-xl font-mono font-bold text-slate-900">₹{totalPartsCost.toLocaleString()}</div>
+            </div>
+         </div>
          <div className="space-y-3">
            {fields.map((field, index) => (
-             <div key={field.id} className="flex flex-wrap md:flex-nowrap items-start gap-2 p-3 bg-slate-50 border border-slate-100 rounded-md">
-                <select className="block w-full md:w-32 border-slate-300 rounded-md shadow-sm sm:text-sm py-1.5" {...register(`parts.${index}.part_category`)}>
-                  {['Engine', 'Battery', 'Brakes', 'Electrical', 'Body', 'Tyres', 'Transmission', 'Cooling', 'Suspension', 'Other'].map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-                <input type="text" placeholder="Part name *" className="block w-full md:flex-1 border-slate-300 rounded-md shadow-sm sm:text-sm py-1.5" {...register(`parts.${index}.part_name`)} />
-                <select className="block w-full md:w-32 border-slate-300 rounded-md shadow-sm sm:text-sm py-1.5" {...register(`parts.${index}.action`)}>
-                  {['replaced', 'repaired', 'inspected', 'adjusted'].map(action => (
-                    <option key={action} value={action}>{action}</option>
-                  ))}
-                </select>
-                <input type="number" min="1" className="block w-20 border-slate-300 rounded-md shadow-sm sm:text-sm py-1.5" {...register(`parts.${index}.quantity`, { valueAsNumber: true })} />
-                <input type="text" placeholder="Notes" className="block w-full md:flex-1 border-slate-300 rounded-md shadow-sm sm:text-sm py-1.5" {...register(`parts.${index}.notes`)} />
-                <button type="button" onClick={() => remove(index)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"><Trash2 className="w-4 h-4" /></button>
+             <div key={field.id} className="grid grid-cols-1 md:grid-cols-12 gap-3 p-4 bg-slate-50 border border-slate-100 rounded-xl relative group">
+                <div className="md:col-span-3">
+                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Category & Name</label>
+                  <div className="flex gap-2">
+                    <select className="block w-24 border-slate-300 rounded-md shadow-sm text-xs py-1.5" {...register(`parts.${index}.part_category`)}>
+                      {['Engine', 'Battery', 'Brakes', 'Electrical', 'Body', 'Tyres', 'Transmission', 'Cooling', 'Suspension', 'Other'].map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                    <input type="text" placeholder="Part name *" className="block flex-1 border-slate-300 rounded-md shadow-sm text-xs py-1.5" {...register(`parts.${index}.part_name`)} />
+                  </div>
+                </div>
+
+                <div className="md:col-span-2">
+                   <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Action</label>
+                   <select className="block w-full border-slate-300 rounded-md shadow-sm text-xs py-1.5" {...register(`parts.${index}.action`)}>
+                    {['replaced', 'repaired', 'inspected', 'adjusted'].map(action => (
+                      <option key={action} value={action}>{action}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="md:col-span-1">
+                   <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Qty</label>
+                   <input type="number" min="1" className="block w-full border-slate-300 rounded-md shadow-sm text-xs py-1.5 font-mono" {...register(`parts.${index}.quantity`, { valueAsNumber: true })} />
+                </div>
+
+                <div className="md:col-span-2">
+                   <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1 flex items-center justify-between">
+                     Unit Price
+                     {amcApplicable && <span className="text-emerald-600 bg-emerald-50 px-1 rounded-[2px] leading-none">AMC</span>}
+                   </label>
+                   <div className="relative">
+                     <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 text-[10px]">₹</span>
+                     <input 
+                       type="number" 
+                       step="0.01"
+                       className={cn(
+                         "block w-full pl-5 border-slate-300 rounded-md shadow-sm text-xs py-1.5 font-mono",
+                         amcApplicable && "bg-emerald-50 border-emerald-200 text-emerald-700 cursor-not-allowed"
+                       )} 
+                       placeholder="0.00"
+                       {...register(`parts.${index}.price`, { valueAsNumber: true })} 
+                       readOnly={amcApplicable}
+                       value={amcApplicable ? 0 : watch(`parts.${index}.price`)}
+                     />
+                   </div>
+                </div>
+
+                <div className="md:col-span-3">
+                   <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Notes</label>
+                   <input type="text" placeholder="Notes" className="block w-full border-slate-300 rounded-md shadow-sm text-xs py-1.5" {...register(`parts.${index}.notes`)} />
+                </div>
+
+                <button type="button" onClick={() => remove(index)} className="absolute -top-2 -right-2 md:relative md:top-auto md:right-auto p-2 bg-white md:bg-transparent shadow-sm md:shadow-none border border-slate-100 md:border-none text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full md:rounded-md transition-colors self-center">
+                  <Trash2 className="w-4 h-4" />
+                </button>
              </div>
            ))}
            {errors.parts && <p className="text-red-500 text-xs mt-1">Please check part details.</p>}
-           <div className="mt-2">
-             <Button type="button" variant="secondary" size="sm" onClick={() => append({ part_category: 'Other', part_name: '', action: 'replaced', quantity: 1, notes: '' })}>
+           <div className="mt-2 flex justify-between items-center">
+             <Button type="button" variant="secondary" size="sm" onClick={() => append({ part_category: 'Other', part_name: '', action: 'replaced', quantity: 1, price: amcApplicable ? 0 : 0, is_amc_benefit: amcApplicable, notes: '' })}>
                <Plus className="w-4 h-4 mr-1" /> Add part
              </Button>
            </div>
@@ -355,17 +467,24 @@ export function JobCardForm({ vehicleId, recordId, initialData }: JobCardFormPro
                </label>
             </div>
           </div>
-          
-          <div className="flex w-full md:w-auto items-center gap-3">
-             <Button type="submit" variant="secondary" disabled={isSubmitting} className="flex-1 md:flex-none">
-                {isOnline ? 'Save' : 'Save locally'}
-             </Button>
-             
-             {isOnline && isEditMode && (
-               <Button type="button" variant="destructive" onClick={handleCloseAttempt} disabled={isSubmitting} className="flex-1 md:flex-none">
-                  Save & Generate Invoice
-               </Button>
-             )}
+
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Final Invoice Total</p>
+               <p className="text-xl font-black text-slate-900 tracking-tighter">₹{totalCost.toLocaleString()}</p>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <Button type="submit" variant="secondary" disabled={isSubmitting} className="w-24">
+                  {isOnline ? 'Save' : 'Save locally'}
+              </Button>
+              
+              {isOnline && isEditMode && (
+                <Button type="button" variant="destructive" onClick={handleCloseAttempt} disabled={isSubmitting} className="flex items-center gap-2">
+                  <CreditCard className="w-4 h-4" /> Finalize & Invoice
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
